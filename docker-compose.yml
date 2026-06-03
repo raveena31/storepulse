@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+    environment:
+      - DB_PATH=/app/data/store_intelligence.db
+      - CONFIG_DIR=/app/config
+      - DATA_DIR=/app/data
+      - POS_CSV_PATH=/app/data/pos_transactions.csv
+    restart: unless-stopped
