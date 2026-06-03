@@ -1,0 +1,104 @@
+store_id: ST1008
+store_name: "Purplle Beauty - ST1008"
+open_hours:
+  start: "10:00"
+  end: "22:00"
+  timezone: "Asia/Kolkata"
+
+# ── CAMERA ROLES ─────────────────────────────────────────────────────────────
+# CAM_01: Interior product wall — Good Vibes / The Face Shop / Minimalist / Derma
+# CAM_02: Main floor — Faces Canada / Lakme / Maybelline / Swiss Beauty
+# CAM_03: Entry / Exit detection — glass door + mat (line-crossing camera)
+# CAM_04: Stockroom / back office — ALL detections = is_staff=True
+# CAM_05: Billing counter / POS — BILLING zone
+# All frames are 1920x1080.
+
+camera_roles:
+  CAM_01: product_zone
+  CAM_02: product_zone
+  CAM_03: entry_exit
+  CAM_04: staff_only
+  CAM_05: billing
+
+# Entry line (CAM_03 frame): pixel row y at which crossing downward = ENTRY
+# The glass door threshold / door mat centre sits at approx y=520
+entry_line_y: 520
+entry_camera: CAM_03
+
+# Glass / mirror mask polygons in CAM_03 frame coords (exclude reflections)
+glass_mask_polygons:
+  - [[800, 380], [1200, 380], [1200, 560], [800, 560]]
+
+# ── ZONES (per-camera coordinate space, 1920x1080) ───────────────────────────
+# Zone polygons are expressed in the coordinate space of the owning camera.
+# assign_zone() is called only with frames from the owning camera.
+
+zones:
+  # CAM_01 zones  (interior product wall, shot from slightly above)
+  MINIMALIST:
+    camera: CAM_01
+    polygon: [[0, 200], [640, 200], [640, 900], [0, 900]]
+    display_name: "Minimalist"
+  THE_FACE_SHOP:
+    camera: CAM_01
+    polygon: [[640, 200], [1280, 200], [1280, 900], [640, 900]]
+    display_name: "The Face Shop"
+  GOOD_VIBES:
+    camera: CAM_01
+    polygon: [[1280, 200], [1920, 200], [1920, 900], [1280, 900]]
+    display_name: "Good Vibes"
+
+  # CAM_02 zones  (main floor, wide angle)
+  FACES_CANADA:
+    camera: CAM_02
+    polygon: [[800, 200], [1920, 200], [1920, 900], [800, 900]]
+    display_name: "Faces Canada"
+  LAKME:
+    camera: CAM_02
+    polygon: [[400, 200], [800, 200], [800, 900], [400, 900]]
+    display_name: "Lakme / Swiss Beauty"
+  FOH_COUNTER:
+    camera: CAM_02
+    polygon: [[0, 300], [400, 300], [400, 900], [0, 900]]
+    display_name: "Front-of-House Counter"
+
+  # CAM_03 zones  (entry camera)
+  ENTRY_ZONE:
+    camera: CAM_03
+    polygon: [[200, 400], [1700, 400], [1700, 750], [200, 750]]
+    display_name: "Entry Zone"
+
+  # CAM_05 zones  (billing / POS)
+  BILLING:
+    camera: CAM_05
+    polygon: [[0, 0], [1920, 0], [1920, 1080], [0, 1080]]
+    display_name: "Billing Counter"
+
+camera_zone_ownership:
+  CAM_01: [MINIMALIST, THE_FACE_SHOP, GOOD_VIBES]
+  CAM_02: [FACES_CANADA, LAKME, FOH_COUNTER]
+  CAM_03: [ENTRY_ZONE]
+  CAM_04: []   # stockroom — no customer zones
+  CAM_05: [BILLING]
+
+# ── BRAND → ZONE MAPPING ──────────────────────────────────────────────────────
+# Maps POS `brand_name` strings to floor zones.
+# Used by attention_vs_sales to reconcile POS revenue with zone dwell.
+# Brand names matched case/whitespace-insensitive (see brand_key()).
+zone_brand_map:
+  MINIMALIST: ["Minimalist", "Be Minimalist"]
+  THE_FACE_SHOP: ["The Face Shop", "TheFaceShop"]
+  GOOD_VIBES: ["Good Vibes"]
+  FACES_CANADA: ["Faces Canada", "FACES CANADA"]
+  LAKME: ["Lakme", "Lakme Absolute", "Lakmé", "Swiss Beauty", "Maybelline"]
+  FOH_COUNTER: ["Round Lab", "DERMDOC", "Plum", "Mamaearth"]
+  NY_BAE: ["NY Bae", "NY BAE"]
+  DERMdoc: ["DERMDOC", "DERMdoc", "Derma Doctor"]
+  # ENTRY_ZONE and BILLING have no associated brand revenue
+
+# ── ZONES WITHOUT CAMERA COVERAGE ─────────────────────────────────────────────
+# Zones listed here have NO live camera feed — dwell data is unavailable.
+# /anomalies must emit COVERAGE_GAP (not DEAD_ZONE) for these.
+zones_without_camera_coverage:
+  - NY_BAE
+  - DERMdoc

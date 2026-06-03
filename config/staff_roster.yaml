@@ -1,0 +1,12 @@
+store_id: ST1008
+staff:
+  - name: "kasthuri v"
+    role: "beauty advisor"
+  - name: "zufishan khazra"
+    role: "beauty advisor"
+  - name: "shashikala"
+    role: "store manager"
+  - name: "naziya begum"
+    role: "beauty advisor"
+  - name: "priya v"
+    role: "cashier"
