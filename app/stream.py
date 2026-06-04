@@ -144,16 +144,30 @@ def _draw_entry_line(frame: np.ndarray) -> np.ndarray:
     return frame
 
 
-def generate_stream(camera_id: str, skip: int = 1) -> Generator[bytes, None, None]:
+def generate_stream(
+    camera_id: str,
+    skip: int = 1,
+    detect_every: int = 10,
+    target_fps: int = 15,
+) -> Generator[bytes, None, None]:
     """
-    Generator that yields MJPEG frames for a given camera.
+    Generator that yields MJPEG frames for a given camera at ~target_fps.
 
-    Each yielded value is a complete JPEG frame wrapped in multipart headers.
-    The browser's <img> tag updates automatically as new frames arrive.
+    Key design (why the old version hung):
+      - YOLO inference on a 1920×1080 frame is ~300-500ms on CPU.
+        Running it per emitted frame caps the stream at ~2fps.
+      - This version runs detection on every `detect_every` frame and
+        REUSES the cached boxes between detections. The video itself
+        keeps playing smoothly; the boxes refresh every ~0.5s.
+      - Replaces model.track() (with its persistent tracker overhead)
+        with model.predict() — we don't need stable IDs in the visual
+        stream, just visible detections.
 
     Args:
-        camera_id: e.g. "CAM_01"
-        skip:      Process every Nth frame. 1 = every frame, 2 = every other frame.
+        camera_id:    e.g. "CAM_01"
+        skip:         Decimate source video — process 1 of every (skip+1) frames
+        detect_every: Re-run YOLO every Nth processed frame
+        target_fps:   Cap output to this rate (default 12fps)
     """
     video_path = VIDEO_PATHS.get(camera_id)
     if not video_path or not os.path.exists(video_path):
@@ -170,16 +184,19 @@ def generate_stream(camera_id: str, skip: int = 1) -> Generator[bytes, None, Non
     model = _get_model()
 
     cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    src_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
     frame_idx = 0
+    emitted = 0
 
-    # track_id → colour (so same person keeps same colour across frames)
-    track_colours: dict[int, tuple] = {}
+    # Cache of latest detections: list of (x1, y1, x2, y2, conf)
+    cached_dets: list[tuple] = []
+
+    frame_period = 1.0 / max(target_fps, 1)
 
     while True:
+        loop_start = time.perf_counter()
         ret, frame = cap.read()
         if not ret:
-            # Loop the video
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             frame_idx = 0
             continue
@@ -191,63 +208,61 @@ def generate_stream(camera_id: str, skip: int = 1) -> Generator[bytes, None, Non
         # ── Resize to 960×540 for faster processing + smaller stream ──────
         frame = cv2.resize(frame, (960, 540))
 
+        # ── Run YOLO ONLY every Nth emitted frame ────────────────────────
+        if emitted % detect_every == 0:
+            try:
+                results = model.predict(
+                    frame,
+                    conf=0.30,
+                    classes=[0],
+                    imgsz=480,        # smaller input = faster inference
+                    verbose=False,
+                )
+                new_dets: list[tuple] = []
+                for result in (results or []):
+                    boxes = result.boxes
+                    if boxes is None:
+                        continue
+                    for box in boxes:
+                        conf = float(box.conf[0])
+                        x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
+                        new_dets.append((x1, y1, x2, y2, conf))
+                cached_dets = new_dets
+            except Exception:
+                # If inference hiccups, keep showing the last good boxes
+                pass
+
         # ── Draw zone overlays ─────────────────────────────────────────────
         frame = _draw_zone_overlays(frame, camera_id)
         if role == "entry_exit":
             frame = _draw_entry_line(frame)
 
-        # ── Run detection + tracking ───────────────────────────────────────
-        try:
-            results = model.track(
-                frame,
-                persist=True,
-                conf=0.25,
-                classes=[0],
-                tracker="bytetrack.yaml",
-                verbose=False,
-            )
-        except Exception:
-            results = []
+        # ── Draw cached bounding boxes ─────────────────────────────────────
+        if role == "staff_only":
+            box_colour = COLOUR_STAFF
+        elif role == "billing":
+            box_colour = (0, 140, 255)
+        elif role == "entry_exit":
+            box_colour = (0, 220, 220)
+        else:
+            box_colour = (0, 220, 0)  # green for product zone
 
-        # ── Draw bounding boxes ────────────────────────────────────────────
-        for result in (results or []):
-            boxes = result.boxes
-            if boxes is None:
-                continue
-            for box in boxes:
-                if box.id is None:
-                    continue
-                tid = int(box.id[0])
-                conf = float(box.conf[0])
-                x1, y1, x2, y2 = [int(v) for v in box.xyxy[0].tolist()]
+        for (x1, y1, x2, y2, conf) in cached_dets:
+            colour = COLOUR_HIGH if conf >= 0.6 else (COLOUR_MED if conf >= 0.4 else COLOUR_LOW)
+            # role overrides
+            if role == "staff_only":
+                colour = COLOUR_STAFF
 
-                # Assign stable colour per track_id
-                if tid not in track_colours:
-                    # Cycle through a palette of distinct colours
-                    palette = [
-                        (0, 220, 0), (0, 200, 220), (220, 120, 0),
-                        (220, 0, 220), (0, 120, 220), (220, 220, 0),
-                        (0, 220, 180), (180, 0, 220),
-                    ]
-                    track_colours[tid] = palette[tid % len(palette)]
-
-                # Override colour for staff camera
-                if role == "staff_only":
-                    colour = COLOUR_STAFF
-                else:
-                    colour = track_colours[tid]
-
-                # Draw filled top bar + bounding box
-                cv2.rectangle(frame, (x1, y1), (x2, y2), colour, 2)
-                label = f"#{tid} {conf:.2f}"
-                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                cv2.rectangle(frame, (x1, y1 - th - 6), (x1 + tw + 4, y1), colour, -1)
-                cv2.putText(frame, label, (x1 + 2, y1 - 4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-
-                # Draw feet point
-                feet_x = (x1 + x2) // 2
-                cv2.circle(frame, (feet_x, y2), 4, colour, -1)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), colour, 2)
+            label = f"person {conf:.2f}"
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+            cv2.rectangle(frame, (x1, max(0, y1 - th - 6)),
+                          (x1 + tw + 4, y1), colour, -1)
+            cv2.putText(frame, label, (x1 + 2, y1 - 4),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+            # feet point
+            feet_x = (x1 + x2) // 2
+            cv2.circle(frame, (feet_x, y2), 4, colour, -1)
 
         # ── Camera role badge ──────────────────────────────────────────────
         role_colours = {
@@ -262,16 +277,12 @@ def generate_stream(camera_id: str, skip: int = 1) -> Generator[bytes, None, Non
         cv2.putText(frame, badge, (6, 20),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # ── Detection count ────────────────────────────────────────────────
-        n_det = sum(
-            len(r.boxes) for r in (results or [])
-            if r.boxes is not None and r.boxes.id is not None
-        )
-        cv2.putText(frame, f"Detected: {n_det}", (6, 520),
+        # ── Detection count (always current from cache) ────────────────────
+        cv2.putText(frame, f"Detected: {len(cached_dets)}", (6, 520),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (200, 200, 200), 1)
 
         # ── Encode as JPEG and yield ───────────────────────────────────────
-        _, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        _, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
         yield (
             b"--frame\r\n"
             b"Content-Type: image/jpeg\r\n\r\n"
@@ -279,7 +290,11 @@ def generate_stream(camera_id: str, skip: int = 1) -> Generator[bytes, None, Non
             + b"\r\n"
         )
 
-        # Throttle to roughly real-time (target ~15fps output)
-        time.sleep(max(0, (skip + 1) / fps - 0.01))
+        emitted += 1
+
+        # ── Throttle to target_fps (accounts for inference time) ──────────
+        elapsed = time.perf_counter() - loop_start
+        if elapsed < frame_period:
+            time.sleep(frame_period - elapsed)
 
     cap.release()

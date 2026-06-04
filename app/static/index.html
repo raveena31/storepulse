@@ -259,6 +259,13 @@
           <button class="tab-btn" onclick="switchView('report')">Store Report</button>
         </div>
         <div class="topbar-sep"></div>
+        <button id="replayBtn"
+                style="background:var(--magenta);color:var(--white);border:none;border-radius:6px;
+                       padding:6px 12px;font-family:var(--font);font-size:12px;font-weight:600;
+                       cursor:pointer;display:flex;align-items:center;gap:6px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--white)"></span>
+          Replay 0 → 93 live
+        </button>
         <div class="status-chip">
           <div class="status-dot" id="statusDot"></div>
           <span id="statusLabel">Connecting…</span>
@@ -301,28 +308,28 @@
               <div class="rec-chip" id="mainRec"><span class="rec-dot"></span>REC</div>
             </div>
             <div class="cam-canvas-wrap">
-              <canvas class="cam-canvas" id="mainCanvas"></canvas>
+              <img class="cam-canvas" id="mainStream" alt="" style="object-fit:cover;background:var(--navy)">
               <div class="cam-awaiting" id="mainAwaiting">Awaiting detection feed · CAM_01</div>
             </div>
             <div class="cam-thumbs">
               <div>
                 <div class="cam-header">
                   <span class="cam-name">CAM_03 · Entry</span>
-                  <div class="rec-chip" id="entryRec"><span class="rec-dot"></span>REC</div>
+                  <div class="rec-chip visible" id="entryRec"><span class="rec-dot"></span>REC</div>
                 </div>
                 <div class="cam-canvas-wrap" style="height:120px;aspect-ratio:unset">
-                  <canvas class="cam-canvas" id="entryCanvas"></canvas>
-                  <div class="cam-awaiting">CAM_03</div>
+                  <img class="cam-canvas" id="entryStream" alt=""
+                       src="/stream/CAM_03?skip=4" style="object-fit:cover;background:var(--navy)">
                 </div>
               </div>
               <div>
                 <div class="cam-header">
                   <span class="cam-name">CAM_05 · Billing</span>
-                  <div class="rec-chip" id="billingRec"><span class="rec-dot"></span>REC</div>
+                  <div class="rec-chip visible" id="billingRec"><span class="rec-dot"></span>REC</div>
                 </div>
                 <div class="cam-canvas-wrap" style="height:120px;aspect-ratio:unset">
-                  <canvas class="cam-canvas" id="billingCanvas"></canvas>
-                  <div class="cam-awaiting">CAM_05</div>
+                  <img class="cam-canvas" id="billingStream" alt=""
+                       src="/stream/CAM_05?skip=4" style="object-fit:cover;background:var(--navy)">
                 </div>
               </div>
             </div>
@@ -373,6 +380,114 @@
               <tr><td colspan="4" style="color:var(--light);font-size:12px;padding:16px 0">Loading zone data…</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Band 4: How is this counted? — full transparency -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">How is this counted? — Provenance Breakdown</span>
+          <span class="section-meta" id="bdMeta">Loading…</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px">
+
+          <!-- Per-camera split -->
+          <div class="card">
+            <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px">
+              Unique tracks per camera
+            </div>
+            <table class="zone-table" id="bdCameraTable">
+              <thead><tr>
+                <th style="width:120px">Camera</th>
+                <th>Role</th>
+                <th>Tracks</th>
+                <th>Events</th>
+              </tr></thead>
+              <tbody id="bdCameraBody"></tbody>
+            </table>
+            <div style="margin-top:12px;font-size:11px;color:var(--mid);line-height:1.5;
+                        padding:10px;background:var(--lavender);border-radius:6px">
+              <strong>Note:</strong> Each camera assigns its own track IDs. A person visible
+              on both CAM_01 and CAM_02 currently counts twice. Cross-camera dedup
+              (EC-17, EC-18) is implemented in <code>pipeline/reid.py</code> + <code>pipeline/crosscam.py</code>
+              and tested, but is not yet wired into the live runner.
+              <strong>Real unique people ≈ 30–50</strong> for this 2.5-minute clip.
+            </div>
+          </div>
+
+          <!-- Per event type split -->
+          <div class="card">
+            <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px">
+              Events by type
+            </div>
+            <table class="zone-table" id="bdEventsTable">
+              <thead><tr>
+                <th>Event type</th>
+                <th>Count</th>
+                <th>Share</th>
+              </tr></thead>
+              <tbody id="bdEventsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Door entry vs internal-only -->
+        <div class="card" style="margin-top:14px">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px">
+            <div>
+              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
+                Door entries · CAM_03
+              </div>
+              <div style="font-size:22px;font-weight:700;color:var(--navy);margin-top:4px"
+                   id="bdDoorEntries">0</div>
+              <div style="font-size:11px;color:var(--mid);margin-top:2px">
+                People who crossed the entry line going INTO the store
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
+                Door exits · CAM_03
+              </div>
+              <div style="font-size:22px;font-weight:700;color:var(--navy);margin-top:4px"
+                   id="bdDoorExits">0</div>
+              <div style="font-size:11px;color:var(--mid);margin-top:2px">
+                Crossed the entry line going OUT
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
+                Estimated in store
+              </div>
+              <div style="font-size:22px;font-weight:700;color:var(--magenta);margin-top:4px"
+                   id="bdInStore">0</div>
+              <div style="font-size:11px;color:var(--mid);margin-top:2px">
+                = door_entries − door_exits
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
+                Confidence split
+              </div>
+              <div style="font-size:13px;font-weight:600;color:var(--navy);margin-top:6px"
+                   id="bdConf">HIGH 0 · MED 0 · LOW 0</div>
+              <div style="font-size:11px;color:var(--mid);margin-top:4px">
+                YOLOv8n detection confidence bands per event
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Band 5: Live event ticker -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Live event stream</span>
+          <span class="section-meta" id="tickerMeta">Polling every 3 s</span>
+        </div>
+        <div class="card" style="padding:0">
+          <div id="eventTicker" style="max-height:280px;overflow-y:auto;font-family:var(--mono);font-size:12px;line-height:1.6">
+            <div style="padding:16px;color:var(--light)">Waiting for events…</div>
+          </div>
         </div>
       </div>
 
@@ -477,44 +592,37 @@ function switchView(name) {
     .classList.add("active");
 }
 
-// ── MJPEG stream in main canvas ──────────────────────────────────────────────
+// ── MJPEG stream (native <img> animation) ───────────────────────────────────
+// Browsers animate multipart/x-mixed-replace responses INSIDE an <img>
+// element automatically — no JS draw loop, no canvas, no onload trick needed.
 let currentCam = "CAM_01";
-let streamImg = null;
 
 function openStream(camId) {
   currentCam = camId;
   document.getElementById("mainCamLabel").textContent =
     `${camId} · ${getCamRole(camId)}`;
-  document.getElementById("mainAwaiting").textContent =
-    `Awaiting detection feed · ${camId}`;
 
-  const canvas = document.getElementById("mainCanvas");
-  const ctx = canvas.getContext("2d");
+  const img = document.getElementById("mainStream");
+  const awaiting = document.getElementById("mainAwaiting");
   const rec = document.getElementById("mainRec");
 
-  if (streamImg) streamImg.src = "";
-  streamImg = new Image();
-  streamImg.style.display = "none";
-  document.body.appendChild(streamImg);
+  // Cache-bust so switching cameras forces a new MJPEG connection
+  const url = `/stream/${camId}?skip=2&t=${Date.now()}`;
 
-  let connected = false;
-
-  streamImg.onload = function() {
-    if (!connected) { connected = true; rec.classList.add("visible"); }
-    document.getElementById("mainAwaiting").style.display = "none";
-    canvas.width = streamImg.naturalWidth || 960;
-    canvas.height = streamImg.naturalHeight || 540;
-    ctx.drawImage(streamImg, 0, 0, canvas.width, canvas.height);
+  // Hide the placeholder once the first frame paints
+  img.onload = () => {
+    awaiting.style.display = "none";
+    rec.classList.add("visible");
+  };
+  img.onerror = () => {
+    awaiting.textContent = `Stream unavailable · ${camId}`;
+    awaiting.style.display = "flex";
+    rec.classList.remove("visible");
   };
 
-  streamImg.onerror = function() {
-    connected = false; rec.classList.remove("visible");
-    document.getElementById("mainAwaiting").style.display = "flex";
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-  // MJPEG stream — browser polls frames automatically
-  streamImg.src = `/stream/${camId}?skip=2`;
+  // Setting src on an <img> with multipart/x-mixed-replace makes the browser
+  // keep the HTTP connection open and replace the image each frame — natively.
+  img.src = url;
 }
 
 function getCamRole(id) {
@@ -774,12 +882,256 @@ function exportReport(format) {
   window.open(`/reports/export?store_id=${STORE_ID}&date=${date}&format=${format}`);
 }
 
+// ── Animated counter — number tweens to new value ───────────────────────────
+const counterState = {};
+function animateCounter(elId, newValue, options = {}) {
+  const decimals = options.decimals ?? 0;
+  const prefix   = options.prefix   ?? "";
+  const suffix   = options.suffix   ?? "";
+  const fmt      = options.format   ?? null;
+  const duration = options.duration ?? 600;
+
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const start = counterState[elId] ?? newValue;
+  if (start === newValue) {
+    el.textContent = fmt ? fmt(newValue) : (prefix + newValue.toFixed(decimals) + suffix);
+    return;
+  }
+  counterState[elId] = newValue;
+  const t0 = performance.now();
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / duration);
+    // ease-out cubic
+    const eased = 1 - Math.pow(1 - k, 3);
+    const v = start + (newValue - start) * eased;
+    el.textContent = fmt ? fmt(v) : (prefix + v.toFixed(decimals) + suffix);
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+// Patch updateMetrics so the headline cards animate instead of jumping
+const _origUpdateMetrics = updateMetrics;
+updateMetrics = function(m) {
+  if (!m || !("unique_visitors" in m)) return;
+  animateCounter("mConv",     m.conversion_rate * 100, { decimals: 2, suffix: "%" });
+  animateCounter("mVisitors", m.unique_visitors,       { decimals: 0 });
+  animateCounter("mRevenue",  m.revenue_inr,           {
+    fmt: v => "₹" + Math.round(v).toLocaleString("en-IN")
+  });
+  const qEl = document.getElementById("mQueue");
+  qEl.textContent = m.current_queue_depth;
+  qEl.className = "metric-value" + (m.current_queue_depth >= 6 ? " alert" : "");
+
+  document.getElementById("mConvSub").textContent =
+    `${m.buyers} buyer${m.buyers !== 1 ? "s" : ""} · ${m.unique_visitors} visitors`;
+  document.getElementById("mRevSub").textContent =
+    `₹${(m.revenue_per_visitor_inr || 0).toFixed(0)} per visitor`;
+
+  const qSub = document.getElementById("mQueueSub");
+  if (m.current_queue_depth >= 6) {
+    qSub.innerHTML = `<span class="queue-pulse"></span>Open second counter`;
+    qSub.className = "metric-sub negative";
+  } else {
+    qSub.textContent = "No alert";
+    qSub.className = "metric-sub";
+  }
+};
+
+// ── Breakdown panel — explains where every number comes from ─────────────────
+const CAM_ROLE = {
+  CAM_01: "Product zone",
+  CAM_02: "Main floor",
+  CAM_03: "Entry / Exit",
+  CAM_04: "Stockroom (staff)",
+  CAM_05: "Billing counter",
+};
+
+async function loadBreakdown(date) {
+  try {
+    const bd = await fetch(`/stores/${STORE_ID}/breakdown?date=${date}`).then(r => r.json());
+    renderBreakdown(bd);
+  } catch (e) {
+    console.warn("breakdown load failed", e);
+  }
+}
+
+function renderBreakdown(bd) {
+  if (!bd || !bd.headline) return;
+  const h = bd.headline;
+
+  document.getElementById("bdMeta").textContent =
+    `${h.events_total} events · ${h.unique_visitors_raw_tracks} raw track IDs · ` +
+    `${h.unique_visitors_sessions} customer sessions · ${h.unique_staff_sessions} staff sessions`;
+
+  animateCounter("bdDoorEntries", h.door_entries_cam03);
+  animateCounter("bdDoorExits",   h.door_exits_cam03);
+  animateCounter("bdInStore",     h.estimated_in_store_now);
+
+  const cb = bd.by_confidence_band || {};
+  document.getElementById("bdConf").textContent =
+    `HIGH ${cb.HIGH || 0} · MED ${cb.MEDIUM || 0} · LOW ${cb.LOW || 0}`;
+
+  // Per-camera table
+  const cams = bd.by_camera || {};
+  const camRows = Object.keys(cams).sort().map(c => {
+    const r = cams[c];
+    return `<tr>
+      <td>${c}</td>
+      <td style="color:var(--mid)">${CAM_ROLE[c] || "—"}</td>
+      <td><strong>${r.unique_customer_tracks}</strong>
+        <span style="color:var(--light);font-size:10px"> / ${r.unique_tracks}</span></td>
+      <td>${r.events_total}</td>
+    </tr>`;
+  }).join("");
+  document.getElementById("bdCameraBody").innerHTML = camRows ||
+    `<tr><td colspan="4" style="color:var(--light);padding:10px 0">No camera events</td></tr>`;
+
+  // Events by type — sorted desc by count
+  const ev = bd.by_event_type || {};
+  const totalEv = Object.values(ev).reduce((a, b) => a + b, 0) || 1;
+  const evRows = Object.entries(ev)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => {
+      const pct = ((v / totalEv) * 100).toFixed(1);
+      return `<tr>
+        <td><code style="font-size:11px">${k}</code></td>
+        <td><strong>${v}</strong></td>
+        <td style="color:var(--mid)">${pct}%</td>
+      </tr>`;
+    }).join("");
+  document.getElementById("bdEventsBody").innerHTML = evRows ||
+    `<tr><td colspan="3" style="color:var(--light);padding:10px 0">No events</td></tr>`;
+}
+
+// ── Live event ticker — last 30 events ───────────────────────────────────────
+const EVENT_COLOURS = {
+  ENTRY: "#16A34A", EXIT: "#6B6B8A", REENTRY: "#7C3AED",
+  ZONE_ENTER: "#0891B2", ZONE_EXIT: "#475569", ZONE_DWELL: "#0EA5E9",
+  BILLING_QUEUE_JOIN: "#D97706", BILLING_QUEUE_ABANDON: "#DC2626",
+};
+
+async function loadTicker(date) {
+  try {
+    const r = await fetch(`/events/recent?store_id=${STORE_ID}&date=${date}&limit=40`);
+    const events = await r.json();
+    renderTicker(events);
+  } catch {}
+}
+
+function renderTicker(events) {
+  const el = document.getElementById("eventTicker");
+  if (!Array.isArray(events) || !events.length) {
+    el.innerHTML = `<div style="padding:16px;color:var(--light)">No events for this date.</div>`;
+    return;
+  }
+  el.innerHTML = events.map(e => {
+    const ts = (e.ts || "").substring(11, 19);
+    const colour = EVENT_COLOURS[e.event_type] || "#1A1A2E";
+    const staff = e.is_staff
+      ? `<span style="color:#9090A8;font-size:10px">STAFF</span>` : "";
+    const zone = e.zone_id
+      ? `<span style="color:var(--mid);font-size:11px">→ ${e.zone_id.replace(/_/g, " ")}</span>` : "";
+    return `<div style="padding:6px 16px;border-bottom:1px solid var(--lavender);
+                        display:flex;gap:12px;align-items:center">
+      <span style="color:var(--light);font-size:11px;min-width:60px">${ts}</span>
+      <span style="color:var(--mid);font-size:11px;min-width:60px">${e.camera_id}</span>
+      <span style="color:${colour};font-weight:600;min-width:170px">${e.event_type}</span>
+      <span style="color:var(--navy);font-family:var(--mono);font-size:11px">${e.visitor_id}</span>
+      ${zone}
+      ${staff}
+    </div>`;
+  }).join("");
+}
+
+// ── Demo replay — animates from 0 → final state via SSE ─────────────────────
+let replaySrc = null;
+let replayActive = false;
+let originalSSE = null;
+
+function toggleReplay() {
+  const btn = document.getElementById("replayBtn");
+  if (replayActive) {
+    stopReplay();
+    btn.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--white)"></span>Replay 0 → 93 live`;
+    btn.style.background = "var(--magenta)";
+    return;
+  }
+
+  replayActive = true;
+  btn.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:#16A34A;animation:pulse 1s infinite"></span>Replaying… click to stop`;
+  btn.style.background = "#16A34A";
+
+  // Reset all counters
+  counterState.mConv = 0; counterState.mVisitors = 0; counterState.mRevenue = 0;
+  counterState.bdDoorEntries = 0; counterState.bdDoorExits = 0; counterState.bdInStore = 0;
+  updateMetrics({
+    conversion_rate: 0, unique_visitors: 0, buyers: 0,
+    current_queue_depth: 0, revenue_inr: 0, revenue_per_visitor_inr: 0,
+  });
+
+  replaySrc = new EventSource(
+    `/dashboard/replay/${STORE_ID}?date=${DATE}&speed=40`
+  );
+  replaySrc.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.done) { stopReplay(); return; }
+      if (d.metrics) {
+        updateMetrics({
+          ...d.metrics,
+          revenue_per_visitor_inr: d.metrics.unique_visitors > 0
+            ? d.metrics.revenue_inr / d.metrics.unique_visitors : 0,
+        });
+      }
+      if (d.headline_breakdown) {
+        const h = d.headline_breakdown;
+        animateCounter("bdDoorEntries", h.door_entries_cam03);
+        animateCounter("bdDoorExits", h.door_exits_cam03);
+        animateCounter("bdInStore", h.estimated_in_store_now);
+      }
+      if (d.by_camera || d.by_event_type) {
+        renderBreakdown({
+          headline: d.headline_breakdown || { events_total: d.events_seen },
+          by_camera: d.by_camera || {},
+          by_event_type: d.by_event_type || {},
+          by_confidence_band: {},
+        });
+      }
+      if (d.latest_events) {
+        renderTicker(d.latest_events.map(e => ({ ...e })));
+      }
+      document.getElementById("tickerMeta").textContent =
+        `Replay · ${d.events_seen}/${d.events_total} events · ${d.replay_progress}%`;
+    } catch (err) { console.warn("replay parse", err); }
+  };
+  replaySrc.onerror = () => stopReplay();
+}
+
+function stopReplay() {
+  replayActive = false;
+  if (replaySrc) { replaySrc.close(); replaySrc = null; }
+  const btn = document.getElementById("replayBtn");
+  btn.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--white)"></span>Replay 0 → 93 live`;
+  btn.style.background = "var(--magenta)";
+  // Re-load real state
+  pollFallback();
+  loadBreakdown(DATE);
+  loadTicker(DATE);
+}
+
+document.getElementById("replayBtn").addEventListener("click", toggleReplay);
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 startSSE();
-// Immediate fallback poll on load
 pollFallback();
-// Poll every 5s
 setInterval(pollFallback, POLL_MS);
+
+// Breakdown + ticker
+loadBreakdown(DATE);
+loadTicker(DATE);
+setInterval(() => { if (!replayActive) { loadBreakdown(DATE); loadTicker(DATE); } }, 4000);
 </script>
 </body>
 </html>

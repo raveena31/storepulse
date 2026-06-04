@@ -251,6 +251,124 @@ async def dashboard_sse(store_id: str, date: Optional[str] = None):
     )
 
 
+# ── Breakdown endpoint — transparency on every number ─────────────────────────
+
+@app.get("/stores/{store_id}/breakdown")
+def breakdown(store_id: str, date: Optional[str] = None):
+    """
+    Returns a complete split of every number on the dashboard:
+    per-camera unique tracks, per-zone visits, per-event-type counts,
+    confidence band distribution, and a provenance section explaining
+    each headline metric.
+    """
+    from .breakdown import compute_breakdown
+    events = _day_events(store_id, date)
+    result = compute_breakdown(events)
+    result["store_id"] = store_id
+    result["date"] = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    result["as_of"] = datetime.now(timezone.utc).isoformat()
+    return result
+
+
+# ── Demo replay — plays back events chronologically at high speed ────────────
+
+@app.get("/dashboard/replay/{store_id}", include_in_schema=False)
+async def replay_sse(
+    store_id: str,
+    date: Optional[str] = None,
+    speed: float = 30.0,
+):
+    """
+    Replays events from the DB at `speed`× real-time speed.
+    Each tick, recomputes metrics on the cumulative subset of events seen so far.
+
+    Perfect for the demo video: visitor counter ticks from 0 -> 93 naturally.
+
+    Query params:
+        speed: playback multiplier (default 30x = 1 hour replayed in 2 minutes)
+    """
+    async def gen():
+        all_events = _day_events(store_id, date)
+        if not all_events:
+            yield "data: " + json.dumps({"replay": "no_data"}) + "\n\n"
+            return
+        all_events.sort(key=lambda e: e.get("ts", ""))
+        clip_start = datetime.fromisoformat(
+            all_events[0]["ts"].replace("Z", "+00:00")
+        )
+
+        # Emit metrics every 1.5s wall-clock while marching through events
+        wall_step = 1.5
+        cursor_idx = 0
+        clip_cursor = clip_start
+
+        from .pos import POS_CSV_PATH as _POS
+        pos = POS_CSV or _POS
+
+        # First emit a zero baseline
+        yield "data: " + json.dumps({
+            "replay_progress": 0,
+            "clip_time_utc": clip_cursor.isoformat(),
+            "events_seen": 0,
+            "events_total": len(all_events),
+            "metrics": compute_metrics([], pos),
+        }) + "\n\n"
+
+        while cursor_idx < len(all_events):
+            await asyncio.sleep(wall_step)
+            # Advance clip cursor by wall_step * speed seconds
+            from datetime import timedelta as _td
+            clip_cursor += _td(seconds=wall_step * speed)
+
+            # Include all events up to clip_cursor
+            while cursor_idx < len(all_events):
+                ts_str = all_events[cursor_idx]["ts"]
+                evt_ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                if evt_ts > clip_cursor:
+                    break
+                cursor_idx += 1
+
+            subset = all_events[:cursor_idx]
+            m = compute_metrics(subset, pos)
+            from .breakdown import compute_breakdown
+            bd = compute_breakdown(subset)
+
+            payload = {
+                "replay_progress": round(cursor_idx / len(all_events) * 100, 1),
+                "clip_time_utc": clip_cursor.isoformat(),
+                "events_seen": cursor_idx,
+                "events_total": len(all_events),
+                "metrics": {
+                    "unique_visitors":     m.get("unique_visitors", 0),
+                    "buyers":              m.get("buyers", 0),
+                    "conversion_rate":     m.get("conversion_rate", 0.0),
+                    "current_queue_depth": m.get("current_queue_depth", 0),
+                    "revenue_inr":         m.get("revenue_inr", 0.0),
+                },
+                "headline_breakdown": bd["headline"],
+                "by_camera":  bd["by_camera"],
+                "by_event_type": bd["by_event_type"],
+                "latest_events": [
+                    {
+                        "ts": e["ts"], "camera_id": e["camera_id"],
+                        "visitor_id": e["visitor_id"], "event_type": e["event_type"],
+                        "zone_id": e.get("zone_id"), "is_staff": bool(e.get("is_staff")),
+                    }
+                    for e in all_events[max(0, cursor_idx - 8):cursor_idx]
+                ][::-1],
+            }
+            yield "data: " + json.dumps(payload) + "\n\n"
+
+        # Final state — held for 5s so the dashboard shows the end-state
+        yield "data: " + json.dumps({"replay_progress": 100, "done": True}) + "\n\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # ── MJPEG video stream ─────────────────────────────────────────────────────────
 
 @app.get("/stream/{camera_id}", include_in_schema=False)
