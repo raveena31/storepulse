@@ -270,6 +270,52 @@ def breakdown(store_id: str, date: Optional[str] = None):
     return result
 
 
+# ── Analytics assistant (dashboard chatbot) ───────────────────────────────────
+
+@app.post("/api/assistant", include_in_schema=False)
+async def analytics_assistant(request: Request):
+    """
+    Answer natural-language questions about store analytics for a given date.
+    Body: {"question": "...", "store_id": "ST1008", "date": "2026-04-10"}
+    """
+    from .assistant import answer_question
+    from .breakdown import compute_breakdown
+
+    try:
+        body = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {exc}") from exc
+
+    store_id = body.get("store_id", "ST1008")
+    date = body.get("date")
+    question = body.get("question", "")
+    use_date = date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    events = _day_events(store_id, date)
+    m = compute_metrics(events, POS_CSV)
+    f = compute_funnel(events, POS_CSV)
+    h = compute_heatmap(events, POS_CSV)
+    a_list = compute_anomalies(
+        events, pos_csv=POS_CSV, store_id=store_id, today_date_str=use_date,
+    )
+    bd = compute_breakdown(events)
+
+    result = answer_question(
+        question,
+        metrics=m,
+        funnel=f,
+        heatmap=h,
+        anomalies=a_list,
+        breakdown=bd,
+        store_id=store_id,
+        date=use_date,
+    )
+    result["store_id"] = store_id
+    result["date"] = use_date
+    result["as_of"] = datetime.now(timezone.utc).isoformat()
+    return result
+
+
 # ── Demo replay — plays back events chronologically at high speed ────────────
 
 @app.get("/dashboard/replay/{store_id}", include_in_schema=False)

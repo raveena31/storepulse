@@ -3,797 +3,1145 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>purplle · Store Intelligence</title>
+  <title>purplle · StorePulse</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    /* ── Design tokens ─────────────────────────────────────────────── */
     :root {
-      --magenta:  #C8006B;
-      --navy:     #1A1A2E;
-      --mid:      #6B6B8A;
-      --light:    #9090A8;
-      --lavender: #F3EDF7;
-      --border:   #E8E0EC;
-      --white:    #FFFFFF;
-      --green:    #16A34A;
-      --red:      #DC2626;
-      --amber:    #D97706;
-      --purple:   #7C3AED;
-      --font:     'DM Sans', sans-serif;
-      --mono:     'DM Mono', monospace;
+      --sidebar: #3B0764;
+      --sidebar-hover: #581C87;
+      --accent: #C8006B;
+      --accent-2: #9333EA;
+      --bg: #F8F5FC;
+      --surface: #FFFFFF;
+      --text: #1E1B2E;
+      --muted: #6B6280;
+      --border: #E5DFED;
+      --ok: #059669;
+      --warn: #D97706;
+      --bad: #DC2626;
+      --chart-h: 272px;
+      --radius: 12px;
+      --font: 'Inter', system-ui, sans-serif;
     }
 
-    /* ── Reset ─────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; font-family: var(--font); font-size: 14px;
-      background: var(--lavender); color: var(--navy); -webkit-font-smoothing: antialiased; }
-
-    /* ── Layout ────────────────────────────────────────────────────── */
-    .app   { display: flex; flex-direction: column; min-height: 100vh; }
-    .page  { max-width: 1280px; margin: 0 auto; padding: 0 32px; width: 100%; }
-
-    /* ── Topbar ────────────────────────────────────────────────────── */
-    .topbar {
-      background: var(--white); border-bottom: 1px solid var(--border);
-      height: 56px; position: sticky; top: 0; z-index: 100;
-    }
-    .topbar-inner {
-      max-width: 1280px; margin: 0 auto; padding: 0 32px;
-      height: 100%; display: flex; align-items: center; justify-content: space-between;
-    }
-    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-    .brand-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--magenta); flex-shrink: 0; }
-    .brand-name { font-size: 18px; font-weight: 700; color: var(--navy); letter-spacing: -0.3px; }
-    .store-label { font-size: 13px; color: var(--mid); font-weight: 400; }
-    .topbar-right { display: flex; align-items: center; gap: 20px; }
-    .tab-group { display: flex; background: var(--lavender); border-radius: 20px; padding: 3px; gap: 2px; }
-    .tab-btn {
-      padding: 5px 16px; border-radius: 16px; border: none; cursor: pointer;
-      font-family: var(--font); font-size: 13px; font-weight: 500; transition: all 0.15s;
-      background: transparent; color: var(--mid);
-    }
-    .tab-btn.active { background: var(--magenta); color: var(--white); }
-    .tab-btn:not(.active):hover { color: var(--navy); }
-    .topbar-sep { width: 1px; height: 20px; background: var(--border); }
-    .status-chip { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mid); }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--light); }
-    .status-dot.live { background: var(--green); animation: pulse 2s infinite; }
-    .status-dot.disc { background: var(--red); }
-    .clock { font-family: var(--mono); font-size: 12px; color: var(--light); }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-
-    /* ── Views ─────────────────────────────────────────────────────── */
-    .view { display: none; }
-    .view.active { display: block; }
-
-    /* ── Section spacing ───────────────────────────────────────────── */
-    .section { margin-top: 32px; }
-    .section:last-child { margin-bottom: 40px; }
-    .section-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
-    .section-title { font-size: 14px; font-weight: 700; color: var(--navy); }
-    .section-meta  { font-size: 12px; color: var(--light); }
-
-    /* ── Cards ─────────────────────────────────────────────────────── */
-    .card {
-      background: var(--white); border: 1px solid var(--border);
-      border-radius: 12px; padding: 20px 24px;
+    html { height: 100%; }
+    body {
+      height: 100%;
+      font-family: var(--font);
+      font-size: 14px;
+      color: var(--text);
+      background: var(--bg);
+      overflow: hidden;
     }
 
-    /* ── Metric cards ──────────────────────────────────────────────── */
-    .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    .metric-label {
-      font-size: 11px; font-weight: 500; color: var(--light);
-      text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px;
-    }
-    .metric-value {
-      font-size: 34px; font-weight: 700; color: var(--navy);
-      line-height: 1; transition: all 0.3s ease;
-    }
-    .metric-value.alert { color: var(--red); }
-    .metric-sub {
-      margin-top: 6px; font-size: 12px; color: var(--light); line-height: 1.4;
-    }
-    .metric-sub.positive { color: var(--green); }
-    .metric-sub.negative { color: var(--red); }
-    .queue-pulse { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-      background: var(--red); animation: pulse 1.2s infinite; margin-right: 4px; }
+    /* Shell */
+    .shell { display: flex; height: 100vh; width: 100%; }
 
-    /* ── Two-col layout ────────────────────────────────────────────── */
-    .two-col { display: grid; grid-template-columns: 60% 1fr; gap: 16px; }
-
-    /* ── Camera feed ───────────────────────────────────────────────── */
-    .cam-panel {}
-    .cam-header { display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 8px; }
-    .cam-name { font-size: 11px; color: var(--light); font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
-    .rec-chip { display: none; align-items: center; gap: 4px; font-size: 10px; color: var(--red); font-weight: 500; }
-    .rec-chip.visible { display: flex; }
-    .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: pulse 1.5s infinite; }
-    .cam-canvas-wrap { position: relative; width: 100%; background: var(--navy); border-radius: 8px; overflow: hidden; aspect-ratio: 16/9; }
-    .cam-canvas { width: 100%; height: 100%; display: block; }
-    .cam-awaiting { position: absolute; inset: 0; display: flex; align-items: center;
-      justify-content: center; color: var(--mid); font-size: 13px; }
-    .cam-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-
-    /* ── Alerts panel ──────────────────────────────────────────────── */
-    .alerts-panel { display: flex; flex-direction: column; gap: 0; }
-    .alerts-title { font-size: 14px; font-weight: 600; color: var(--navy); margin-bottom: 12px; }
-    .alert-item {
-      padding: 12px 14px; border-left: 3px solid transparent;
-      border-bottom: 1px solid var(--border); transition: all 0.2s;
+    /* Sidebar */
+    .sidebar {
+      width: 232px;
+      flex-shrink: 0;
+      background: linear-gradient(180deg, var(--sidebar) 0%, #2E1065 100%);
+      color: #F5F3FF;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 14px;
+      z-index: 50;
     }
-    .alert-item:last-child { border-bottom: none; }
-    .alert-item.CRITICAL { border-left-color: var(--red);   background: #FEF2F2; }
-    .alert-item.WARN     { border-left-color: var(--amber); background: #FFFBEB; }
-    .alert-item.INFO     { border-left-color: var(--purple);background: #F5F3FF; }
-    .alert-sev   { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
-    .alert-type  { font-size: 13px; font-weight: 500; color: var(--navy); margin-bottom: 2px; }
-    .alert-action{ font-size: 12px; color: var(--mid); line-height: 1.5; }
-    .all-clear   { padding: 24px 14px; color: var(--green); font-size: 13px; text-align: center; }
-
-    /* ── Zone performance ──────────────────────────────────────────── */
-    .zone-table { width: 100%; border-collapse: collapse; }
-    .zone-table th {
-      font-size: 11px; font-weight: 500; color: var(--light); text-transform: uppercase;
-      letter-spacing: 0.5px; padding: 0 0 10px; text-align: left; border-bottom: 1px solid var(--border);
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+      margin-bottom: 16px;
     }
-    .zone-table th:not(:first-child) { text-align: right; }
-    .zone-table td { padding: 10px 0; border-bottom: 1px solid var(--lavender); font-size: 13px; }
-    .zone-table td:not(:first-child) { text-align: right; }
-    .zone-table tr:last-child td { border-bottom: none; }
-    .zone-name-cell { font-weight: 500; color: var(--navy); }
-    .bar-cell { min-width: 120px; }
-    .bar-wrap { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
-    .mini-bar { height: 8px; border-radius: 4px; min-width: 2px; }
-    .bar-dwell { background: rgba(200, 0, 107, 0.45); }
-    .bar-rev   { background: var(--magenta); }
-    .bar-val   { font-size: 11px; color: var(--mid); width: 32px; text-align: right; font-family: var(--mono); }
-    .gap-badge { font-size: 11px; font-weight: 500; }
-    .gap-badge.review { color: var(--red); }
-    .gap-badge.ok     { color: var(--green); }
+    .sidebar-brand .logo {
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: grid; place-items: center;
+      font-weight: 700; font-size: 14px;
+    }
+    .sidebar-brand h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .sidebar-brand p { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: rgba(255,255,255,0.85);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      margin-bottom: 4px;
+      transition: background 0.15s;
+    }
+    .nav-item:hover { background: var(--sidebar-hover); }
+    .nav-item.active { background: rgba(200,0,107,0.35); color: #fff; font-weight: 600; }
+    .nav-icon { width: 18px; text-align: center; opacity: 0.9; }
+    .sidebar-foot {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,0.12);
+      font-size: 11px;
+      opacity: 0.75;
+      line-height: 1.5;
+    }
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(5,150,105,0.2);
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+    .live-pill .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #34D399;
+    }
+    .live-pill .dot.off { background: var(--bad); }
+    .live-pill .dot.pulse { animation: blink 2s infinite; }
+    @keyframes blink { 50% { opacity: 0.35; } }
 
-    /* ── Report view ───────────────────────────────────────────────── */
-    .report-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-    .report-date-input {
-      border: 1px solid var(--border); background: var(--white);
-      color: var(--navy); padding: 7px 12px; border-radius: 8px;
-      font-size: 13px; font-family: var(--font);
+    /* Workspace */
+    .workspace {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .toolbar {
+      flex-shrink: 0;
+      height: 56px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      gap: 16px;
+    }
+    .toolbar h2 { font-size: 16px; font-weight: 700; }
+    .toolbar-meta { font-size: 12px; color: var(--muted); }
+    .toolbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .btn {
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+      padding: 8px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .btn-primary {
-      background: var(--magenta); color: var(--white); border: none;
-      padding: 0 18px; height: 34px; border-radius: 8px; cursor: pointer;
-      font-size: 13px; font-family: var(--font); font-weight: 500;
-      display: flex; align-items: center; gap: 8px; transition: opacity 0.15s;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
     }
-    .btn-primary:hover { opacity: 0.9; }
-    .btn-outline {
-      background: var(--white); color: var(--mid); border: 1px solid var(--border);
-      padding: 0 14px; height: 34px; border-radius: 8px; cursor: pointer;
-      font-size: 13px; font-family: var(--font); font-weight: 400; transition: border-color 0.15s;
+    .btn-ghost {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
     }
-    .btn-outline:hover { border-color: var(--mid); color: var(--navy); }
-    .spinner {
-      width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: none;
+    .clock { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .scroll-main {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 20px 24px 100px;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Report document ───────────────────────────────────────────── */
-    #reportDoc { display: none; }
-    .report-doc { max-width: 900px; }
-    .report-head { margin-bottom: 24px; }
-    .report-title { font-size: 22px; font-weight: 700; color: var(--navy); }
-    .report-sub   { font-size: 13px; color: var(--light); margin-top: 4px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
 
-    .snapshot-row {
-      display: flex; border: 1px solid var(--border); border-radius: 10px;
-      overflow: hidden; margin-bottom: 28px; background: var(--white);
+    /* 12-column dashboard grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 16px;
+      align-items: stretch;
     }
-    .snapshot-item { flex: 1; padding: 16px 20px; border-right: 1px solid var(--border); }
-    .snapshot-item:last-child { border-right: none; }
-    .snap-label { font-size: 11px; color: var(--light); text-transform: uppercase;
-      letter-spacing: 0.5px; margin-bottom: 6px; }
-    .snap-value { font-size: 18px; font-weight: 600; color: var(--navy); }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
 
-    .report-section { margin-bottom: 28px; }
-    .report-section-title { font-size: 14px; font-weight: 600; color: var(--navy);
-      margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-
-    /* Funnel */
-    .funnel-steps { display: flex; align-items: center; gap: 0; }
-    .funnel-step { flex: 1; text-align: center; padding: 14px 8px;
-      background: var(--lavender); border-radius: 8px; position: relative; }
-    .funnel-step + .funnel-step { margin-left: 2px; }
-    .funnel-step-name  { font-size: 11px; color: var(--mid); margin-bottom: 4px; }
-    .funnel-step-count { font-size: 20px; font-weight: 700; color: var(--navy); }
-    .funnel-step-drop  { font-size: 11px; color: var(--red); margin-top: 2px; }
-    .funnel-arrow { font-size: 16px; color: var(--border); margin: 0 2px; flex-shrink: 0;
-      align-self: center; }
-
-    /* Report table */
-    .report-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .report-table th { font-size: 11px; font-weight: 500; color: var(--light);
-      text-transform: uppercase; letter-spacing: 0.5px;
-      padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-    .report-table td { padding: 9px 12px; border-bottom: 1px solid var(--lavender); }
-    .report-table tr:nth-child(even) td { background: #FAFAFA; }
-    .report-table tr:last-child td { border-bottom: none; }
-
-    /* Alert list in report */
-    .report-alert-row {
-      display: flex; gap: 12px; padding: 10px 0;
-      border-bottom: 1px solid var(--lavender); font-size: 13px;
+    .box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .box-head {
+      display: flex;
+      justify-content: space-between;
       align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
     }
-    .report-alert-row:last-child { border-bottom: none; }
-    .report-sev {
-      font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
-      white-space: nowrap; margin-top: 1px;
+    .box-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .box-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* KPI */
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+      margin: 6px 0 4px;
     }
-    .sev-CRITICAL { background: #FEE2E2; color: var(--red); }
-    .sev-WARN     { background: #FEF3C7; color: var(--amber); }
-    .sev-INFO     { background: #EDE9FE; color: var(--purple); }
-    .report-alert-body { flex: 1; }
-    .report-alert-type { font-weight: 500; color: var(--navy); }
-    .report-alert-action { font-size: 12px; color: var(--mid); }
+    .kpi-value.danger { color: var(--bad); }
+    .kpi-foot { font-size: 12px; color: var(--muted); }
+    .kpi-bar {
+      height: 4px;
+      background: var(--bg);
+      border-radius: 4px;
+      margin-top: 12px;
+      overflow: hidden;
+    }
+    .kpi-bar > i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+
+    /* Charts — fixed height prevents layout blow-up */
+    .chart-slot {
+      position: relative;
+      width: 100%;
+      height: var(--chart-h);
+      min-height: var(--chart-h);
+      max-height: var(--chart-h);
+      flex-shrink: 0;
+    }
+    .chart-slot canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Video */
+    .video-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #0F0A1A;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .video-box img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .video-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(15,10,26,0.85);
+      color: #A89BB8;
+      font-size: 12px;
+    }
+    .thumb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .thumb-box { aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; background: #0F0A1A; }
+    .thumb-box img { width: 100%; height: 100%; object-fit: cover; }
+    .cam-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .cam-tab {
+      padding: 5px 10px;
+      font-size: 11px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      cursor: pointer;
+      font-family: var(--font);
+      color: var(--muted);
+    }
+    .cam-tab.active, .cam-tab:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(200,0,107,0.08);
+    }
+    .rec { font-size: 10px; color: var(--bad); font-weight: 600; }
+
+    /* Alerts */
+    .alerts-box { max-height: 420px; overflow-y: auto; }
+    .alert-row {
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border-left: 3px solid var(--border);
+      background: var(--bg);
+    }
+    .alert-row.CRITICAL { border-left-color: var(--bad); background: #FEF2F2; }
+    .alert-row.WARN { border-left-color: var(--warn); background: #FFFBEB; }
+    .alert-row.INFO { border-left-color: var(--accent-2); background: #F5F3FF; }
+    .alert-row strong { font-size: 11px; display: block; margin-bottom: 2px; }
+    .alert-row span { font-size: 12px; color: var(--muted); }
+
+    /* Tables */
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table th {
+      text-align: left;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--muted);
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+    }
+    .data-table th:not(:first-child) { text-align: right; }
+    .data-table td { padding: 10px 0; border-bottom: 1px solid var(--bg); }
+    .data-table td:not(:first-child) { text-align: right; }
+    .bar-inline { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+    .bar-fill { height: 6px; border-radius: 3px; min-width: 2px; }
+    .bar-dwell { background: rgba(147,51,234,0.55); }
+    .bar-rev { background: var(--accent); }
+
+    /* Ticker */
+    .ticker {
+      max-height: 220px;
+      overflow-y: auto;
+      font-size: 12px;
+      font-family: ui-monospace, monospace;
+    }
+    .ticker-item {
+      display: grid;
+      grid-template-columns: 58px 52px 140px 1fr;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--bg);
+      align-items: center;
+    }
+
+    /* Report */
+    .report-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .report-bar input {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font);
+    }
+    .snap-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .snap {
+      text-align: center;
+      padding: 16px;
+      background: linear-gradient(135deg, rgba(200,0,107,0.06), rgba(147,51,234,0.08));
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    .snap b { display: block; font-size: 22px; margin-top: 6px; }
+    .funnel-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 20px; }
+    .funnel-card {
+      flex: 1; min-width: 100px;
+      padding: 14px;
+      background: var(--bg);
+      border-radius: 10px;
+      text-align: center;
+      border: 1px solid var(--border);
+    }
+
+    /* Chatbot */
+    .chat-fab {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+      font-size: 22px;
+      cursor: pointer;
+      box-shadow: 0 8px 28px rgba(147,51,234,0.4);
+      z-index: 400;
+      transition: transform 0.2s;
+    }
+    .chat-fab:hover { transform: scale(1.05); }
+    .chat-panel {
+      position: fixed;
+      right: 24px;
+      bottom: 92px;
+      width: 380px;
+      max-width: calc(100vw - 48px);
+      height: 480px;
+      max-height: calc(100vh - 120px);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(30,27,46,0.18);
+      z-index: 400;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat-panel.open { display: flex; }
+    .chat-head {
+      padding: 14px 16px;
+      background: linear-gradient(135deg, var(--sidebar), #5B21B6);
+      color: #fff;
+    }
+    .chat-head h3 { font-size: 14px; font-weight: 700; }
+    .chat-head p { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+    .chat-msgs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #FDFBFF;
+    }
+    .msg {
+      max-width: 92%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .msg.bot {
+      align-self: flex-start;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #fff;
+    }
+    .msg.typing { color: var(--muted); font-style: italic; }
+    .chat-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 14px 8px;
+    }
+    .chip {
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      color: var(--accent);
+      font-family: var(--font);
+    }
+    .chip:hover { background: rgba(200,0,107,0.08); }
+    .chat-input-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .chat-input-row input {
+      flex: 1;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-family: var(--font);
+      font-size: 13px;
+      outline: none;
+    }
+    .chat-input-row input:focus { border-color: var(--accent-2); }
+    .chat-input-row button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: var(--font);
+    }
+
+    @media (max-width: 1100px) {
+      .span-3, .span-4 { grid-column: span 6; }
+      .span-6, .span-8 { grid-column: span 12; }
+      .sidebar { width: 72px; padding: 16px 8px; }
+      .sidebar-brand h1, .sidebar-brand p, .nav-item span:not(.nav-icon), .sidebar-foot > *:not(.live-pill) { display: none; }
+      .nav-item { justify-content: center; padding: 12px; }
+    }
+    @media (max-width: 640px) {
+      .span-3, .span-4, .span-6 { grid-column: span 12; }
+      .snap-grid { grid-template-columns: 1fr 1fr; }
+      body { overflow: auto; }
+      .shell { height: auto; min-height: 100vh; }
+      .workspace { overflow: visible; }
+      .scroll-main { overflow: visible; }
+    }
   </style>
 </head>
 <body>
-<div class="app">
 
-  <!-- ── Topbar ──────────────────────────────────────────────────────── -->
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div style="display:flex;align-items:center;gap:20px">
-        <a class="brand" href="#">
-          <span class="brand-dot"></span>
-          <span class="brand-name">purplle</span>
-        </a>
-        <span class="store-label">Brigade Road · ST1008</span>
-      </div>
-      <div class="topbar-right">
-        <div class="tab-group">
-          <button class="tab-btn active" onclick="switchView('live')">Live Operations</button>
-          <button class="tab-btn" onclick="switchView('report')">Store Report</button>
-        </div>
-        <div class="topbar-sep"></div>
-        <button id="replayBtn"
-                style="background:var(--magenta);color:var(--white);border:none;border-radius:6px;
-                       padding:6px 12px;font-family:var(--font);font-size:12px;font-weight:600;
-                       cursor:pointer;display:flex;align-items:center;gap:6px;">
-          <span style="width:7px;height:7px;border-radius:50%;background:var(--white)"></span>
-          Replay 0 → 93 live
-        </button>
-        <div class="status-chip">
-          <div class="status-dot" id="statusDot"></div>
-          <span id="statusLabel">Connecting…</span>
-        </div>
-        <span class="clock" id="clock">—</span>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">P</div>
+      <div>
+        <h1>purplle</h1>
+        <p>StorePulse</p>
       </div>
     </div>
-  </header>
-
-  <!-- ── VIEW 1: Live Operations ────────────────────────────────────── -->
-  <div id="viewLive" class="view active">
-    <div class="page">
-
-      <!-- Band 1: Metrics -->
-      <div class="section">
-        <div class="metrics-grid" id="metricsGrid">
-          <div class="card"><div class="metric-label">Today's Conversion</div>
-            <div class="metric-value" id="mConv">—</div>
-            <div class="metric-sub" id="mConvSub">Loading…</div></div>
-          <div class="card"><div class="metric-label">Unique Visitors</div>
-            <div class="metric-value" id="mVisitors">—</div>
-            <div class="metric-sub">Staff excluded · session-deduped</div></div>
-          <div class="card"><div class="metric-label">Revenue Today</div>
-            <div class="metric-value" id="mRevenue">—</div>
-            <div class="metric-sub" id="mRevSub">Loading…</div></div>
-          <div class="card"><div class="metric-label">Queue Now</div>
-            <div class="metric-value" id="mQueue">—</div>
-            <div class="metric-sub" id="mQueueSub">Loading…</div></div>
-        </div>
+    <button class="nav-item active" data-view="live" type="button">
+      <span class="nav-icon">◉</span><span>Live Dashboard</span>
+    </button>
+    <button class="nav-item" data-view="report" type="button">
+      <span class="nav-icon">▣</span><span>Store Report</span>
+    </button>
+    <div class="sidebar-foot">
+      Brigade Road<br>ST1008
+      <div class="live-pill" id="sidebarStatus">
+        <span class="dot pulse" id="sidebarDot"></span>
+        <span id="sidebarStatusText">Connecting</span>
       </div>
+    </div>
+  </aside>
 
-      <!-- Band 2: Detection Feed + Alerts -->
-      <div class="section">
-        <div class="two-col">
+  <div class="workspace">
+    <header class="toolbar">
+      <div>
+        <h2 id="pageTitle">Live Dashboard</h2>
+        <div class="toolbar-meta" id="pageMeta">Real-time CCTV analytics · 2026-04-10</div>
+      </div>
+      <div class="toolbar-actions">
+        <span class="clock" id="clock">—</span>
+      </div>
+    </header>
 
-          <!-- Camera feed -->
-          <div>
-            <div class="cam-header">
-              <span class="cam-name" id="mainCamLabel">CAM_01 · Product Zone</span>
-              <div class="rec-chip" id="mainRec"><span class="rec-dot"></span>REC</div>
-            </div>
-            <div class="cam-canvas-wrap">
-              <img class="cam-canvas" id="mainStream" alt="" style="object-fit:cover;background:var(--navy)">
-              <div class="cam-awaiting" id="mainAwaiting">Awaiting detection feed · CAM_01</div>
-            </div>
-            <div class="cam-thumbs">
-              <div>
-                <div class="cam-header">
-                  <span class="cam-name">CAM_03 · Entry</span>
-                  <div class="rec-chip visible" id="entryRec"><span class="rec-dot"></span>REC</div>
-                </div>
-                <div class="cam-canvas-wrap" style="height:120px;aspect-ratio:unset">
-                  <img class="cam-canvas" id="entryStream" alt=""
-                       src="/stream/CAM_03?skip=4" style="object-fit:cover;background:var(--navy)">
-                </div>
-              </div>
-              <div>
-                <div class="cam-header">
-                  <span class="cam-name">CAM_05 · Billing</span>
-                  <div class="rec-chip visible" id="billingRec"><span class="rec-dot"></span>REC</div>
-                </div>
-                <div class="cam-canvas-wrap" style="height:120px;aspect-ratio:unset">
-                  <img class="cam-canvas" id="billingStream" alt=""
-                       src="/stream/CAM_05?skip=4" style="object-fit:cover;background:var(--navy)">
-                </div>
-              </div>
-            </div>
+    <main class="scroll-main">
 
-            <!-- Camera selector tabs -->
-            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-              <span style="font-size:11px;color:var(--light);align-self:center">Switch to:</span>
-              <button class="btn-outline" style="height:28px;font-size:11px;padding:0 10px"
-                onclick="openStream('CAM_01')">CAM 1 — Products</button>
-              <button class="btn-outline" style="height:28px;font-size:11px;padding:0 10px"
-                onclick="openStream('CAM_02')">CAM 2 — Floor</button>
-              <button class="btn-outline" style="height:28px;font-size:11px;padding:0 10px"
-                onclick="openStream('CAM_03')">CAM 3 — Entry</button>
-              <button class="btn-outline" style="height:28px;font-size:11px;padding:0 10px"
-                onclick="openStream('CAM_04')">CAM 4 — Stockroom</button>
-              <button class="btn-outline" style="height:28px;font-size:11px;padding:0 10px"
-                onclick="openStream('CAM_05')">CAM 5 — Billing</button>
-            </div>
+      <section id="viewLive" class="panel active">
+        <div class="grid" style="margin-bottom:16px">
+          <div class="box span-3">
+            <div class="box-head"><div><div class="box-title">Conversion</div></div></div>
+            <div class="kpi-value" id="mConv">—</div>
+            <div class="kpi-foot" id="mConvSub">—</div>
+            <div class="kpi-bar"><i id="barConv"></i></div>
           </div>
-
-          <!-- Alerts -->
-          <div class="card alerts-panel" style="padding:20px 0">
-            <div class="alerts-title" style="padding:0 20px">Alerts</div>
-            <div id="alertsList">
-              <div class="all-clear">Loading alerts…</div>
-            </div>
+          <div class="box span-3">
+            <div class="box-title">Unique Visitors</div>
+            <div class="kpi-value" id="mVisitors">—</div>
+            <div class="kpi-foot">Staff excluded</div>
+            <div class="kpi-bar"><i id="barVisitors"></i></div>
+          </div>
+          <div class="box span-3">
+            <div class="box-title">Revenue</div>
+            <div class="kpi-value" id="mRevenue">—</div>
+            <div class="kpi-foot" id="mRevSub">—</div>
+            <div class="kpi-bar"><i id="barRevenue"></i></div>
+          </div>
+          <div class="box span-3" id="boxQueue">
+            <div class="box-title">Queue Depth</div>
+            <div class="kpi-value" id="mQueue">—</div>
+            <div class="kpi-foot" id="mQueueSub">—</div>
+            <div class="kpi-bar"><i id="barQueue"></i></div>
           </div>
         </div>
-      </div>
 
-      <!-- Band 3: Zone performance -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Zone Performance — Dwell vs Revenue</span>
-          <span class="section-meta">Today · ST1008 Brigade Rd</span>
-        </div>
-        <div class="card">
-          <table class="zone-table">
-            <thead>
-              <tr>
-                <th style="width:160px">Zone</th>
-                <th>Dwell share</th>
-                <th>Revenue share</th>
-                <th style="width:140px">Assessment</th>
-              </tr>
-            </thead>
-            <tbody id="zoneTableBody">
-              <tr><td colspan="4" style="color:var(--light);font-size:12px;padding:16px 0">Loading zone data…</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Band 4: How is this counted? — full transparency -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">How is this counted? — Provenance Breakdown</span>
-          <span class="section-meta" id="bdMeta">Loading…</span>
-        </div>
-        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px">
-
-          <!-- Per-camera split -->
-          <div class="card">
-            <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px">
-              Unique tracks per camera
+        <div class="grid" style="margin-bottom:16px">
+          <div class="box span-8">
+            <div class="box-head">
+              <div>
+                <div class="box-title" id="mainCamLabel">CAM_01 · Product Zone</div>
+                <div class="box-sub">MJPEG detection overlay</div>
+              </div>
+              <span class="rec" id="mainRec" style="display:none">● REC</span>
             </div>
-            <table class="zone-table" id="bdCameraTable">
-              <thead><tr>
-                <th style="width:120px">Camera</th>
-                <th>Role</th>
-                <th>Tracks</th>
-                <th>Events</th>
-              </tr></thead>
+            <div class="video-box">
+              <img id="mainStream" alt="" />
+              <div class="video-overlay" id="mainAwaiting">Connecting to stream…</div>
+            </div>
+            <div class="thumb-row">
+              <div class="thumb-box"><img id="entryStream" src="/stream/CAM_03?skip=4" alt="Entry" /></div>
+              <div class="thumb-box"><img id="billingStream" src="/stream/CAM_05?skip=4" alt="Billing" /></div>
+            </div>
+            <div class="cam-tabs">
+              <button class="cam-tab active" data-cam="CAM_01" type="button">CAM 1</button>
+              <button class="cam-tab" data-cam="CAM_02" type="button">CAM 2</button>
+              <button class="cam-tab" data-cam="CAM_03" type="button">CAM 3</button>
+              <button class="cam-tab" data-cam="CAM_04" type="button">CAM 4</button>
+              <button class="cam-tab" data-cam="CAM_05" type="button">CAM 5</button>
+            </div>
+          </div>
+          <div class="box span-4">
+            <div class="box-head">
+              <div class="box-title">Alerts <span id="alertCount" style="color:var(--accent)">0</span></div>
+            </div>
+            <div class="alerts-box" id="alertsList">
+              <div class="kpi-foot" style="padding:20px 0;text-align:center">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-bottom:16px">
+          <div class="box span-6">
+            <div class="box-title">Visitor & buyer trend</div>
+            <div class="box-sub">Live samples from metrics API</div>
+            <div class="chart-slot"><canvas id="chartTrend"></canvas></div>
+          </div>
+          <div class="box span-6">
+            <div class="box-title">Customer funnel</div>
+            <div class="box-sub">Entry → zone → billing → purchase</div>
+            <div class="chart-slot"><canvas id="chartFunnel"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-bottom:16px">
+          <div class="box span-4">
+            <div class="box-title">Zone traffic index</div>
+            <div class="chart-slot"><canvas id="chartZones"></canvas></div>
+          </div>
+          <div class="box span-4">
+            <div class="box-title">Dwell vs revenue %</div>
+            <div class="chart-slot"><canvas id="chartDwellRev"></canvas></div>
+          </div>
+          <div class="box span-4">
+            <div class="box-title">Event distribution</div>
+            <div class="chart-slot"><canvas id="chartEvents"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-bottom:16px">
+          <div class="box span-12">
+            <div class="box-head">
+              <div class="box-title">Zone performance</div>
+              <div class="box-sub">Dwell share vs revenue share</div>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr><th>Zone</th><th>Dwell</th><th>Revenue</th><th>Status</th></tr>
+              </thead>
+              <tbody id="zoneTableBody">
+                <tr><td colspan="4" style="color:var(--muted)">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="grid" style="margin-bottom:16px">
+          <div class="box span-6">
+            <div class="box-title">Camera breakdown</div>
+            <div class="box-sub" id="bdMeta">—</div>
+            <table class="data-table" style="margin-top:10px">
+              <thead><tr><th>Cam</th><th>Role</th><th>Tracks</th><th>Events</th></tr></thead>
               <tbody id="bdCameraBody"></tbody>
             </table>
-            <div style="margin-top:12px;font-size:11px;color:var(--mid);line-height:1.5;
-                        padding:10px;background:var(--lavender);border-radius:6px">
-              <strong>Note:</strong> Each camera assigns its own track IDs. A person visible
-              on both CAM_01 and CAM_02 currently counts twice. Cross-camera dedup
-              (EC-17, EC-18) is implemented in <code>pipeline/reid.py</code> + <code>pipeline/crosscam.py</code>
-              and tested, but is not yet wired into the live runner.
-              <strong>Real unique people ≈ 30–50</strong> for this 2.5-minute clip.
-            </div>
           </div>
-
-          <!-- Per event type split -->
-          <div class="card">
-            <div style="font-size:12px;font-weight:600;color:var(--navy);margin-bottom:10px">
-              Events by type
+          <div class="box span-6">
+            <div class="box-title">Door flow & events</div>
+            <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0">
+              <div class="snap" style="padding:12px"><small>Entries</small><b id="bdDoorEntries">0</b></div>
+              <div class="snap" style="padding:12px"><small>Exits</small><b id="bdDoorExits">0</b></div>
+              <div class="snap" style="padding:12px"><small>In store</small><b id="bdInStore" style="color:var(--accent)">0</b></div>
             </div>
-            <table class="zone-table" id="bdEventsTable">
-              <thead><tr>
-                <th>Event type</th>
-                <th>Count</th>
-                <th>Share</th>
-              </tr></thead>
+            <div class="box-sub" id="bdConf" style="margin-bottom:8px">—</div>
+            <table class="data-table">
+              <thead><tr><th>Event</th><th>Count</th><th>%</th></tr></thead>
               <tbody id="bdEventsBody"></tbody>
             </table>
           </div>
         </div>
 
-        <!-- Door entry vs internal-only -->
-        <div class="card" style="margin-top:14px">
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px">
-            <div>
-              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
-                Door entries · CAM_03
-              </div>
-              <div style="font-size:22px;font-weight:700;color:var(--navy);margin-top:4px"
-                   id="bdDoorEntries">0</div>
-              <div style="font-size:11px;color:var(--mid);margin-top:2px">
-                People who crossed the entry line going INTO the store
-              </div>
+        <div class="grid">
+          <div class="box span-12">
+            <div class="box-head">
+              <div class="box-title">Live events</div>
+              <div class="box-sub" id="tickerMeta">Polling…</div>
             </div>
-            <div>
-              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
-                Door exits · CAM_03
-              </div>
-              <div style="font-size:22px;font-weight:700;color:var(--navy);margin-top:4px"
-                   id="bdDoorExits">0</div>
-              <div style="font-size:11px;color:var(--mid);margin-top:2px">
-                Crossed the entry line going OUT
-              </div>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
-                Estimated in store
-              </div>
-              <div style="font-size:22px;font-weight:700;color:var(--magenta);margin-top:4px"
-                   id="bdInStore">0</div>
-              <div style="font-size:11px;color:var(--mid);margin-top:2px">
-                = door_entries − door_exits
-              </div>
-            </div>
-            <div>
-              <div style="font-size:11px;color:var(--light);text-transform:uppercase;letter-spacing:0.5px">
-                Confidence split
-              </div>
-              <div style="font-size:13px;font-weight:600;color:var(--navy);margin-top:6px"
-                   id="bdConf">HIGH 0 · MED 0 · LOW 0</div>
-              <div style="font-size:11px;color:var(--mid);margin-top:4px">
-                YOLOv8n detection confidence bands per event
-              </div>
-            </div>
+            <div class="ticker" id="eventTicker"></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Band 5: Live event ticker -->
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Live event stream</span>
-          <span class="section-meta" id="tickerMeta">Polling every 3 s</span>
-        </div>
-        <div class="card" style="padding:0">
-          <div id="eventTicker" style="max-height:280px;overflow-y:auto;font-family:var(--mono);font-size:12px;line-height:1.6">
-            <div style="padding:16px;color:var(--light)">Waiting for events…</div>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /page -->
-  </div><!-- /viewLive -->
-
-  <!-- ── VIEW 2: Store Report ───────────────────────────────────────── -->
-  <div id="viewReport" class="view">
-    <div class="page">
-      <div class="section">
-
-        <!-- Controls -->
-        <div class="card" style="margin-bottom:24px">
-          <div class="report-controls">
-            <input type="date" class="report-date-input" id="reportDate" value="2026-04-10" />
-            <button class="btn-primary" onclick="generateReport()">
-              <div class="spinner" id="reportSpinner"></div>
-              Generate Report
-            </button>
-            <button class="btn-outline" onclick="exportReport('csv')">Download CSV</button>
-            <button class="btn-outline" onclick="exportReport('json')">Download JSON</button>
-          </div>
+      <section id="viewReport" class="panel">
+        <div class="report-bar box" style="flex-direction:row">
+          <input type="date" id="reportDate" value="2026-04-10" />
+          <button class="btn btn-primary" type="button" onclick="generateReport()">Generate report</button>
+          <button class="btn btn-ghost" type="button" onclick="exportReport('csv')">CSV</button>
+          <button class="btn btn-ghost" type="button" onclick="exportReport('json')">JSON</button>
         </div>
 
-        <!-- Report document (rendered after Generate) -->
-        <div id="reportDoc" class="card report-doc">
-          <div class="report-head">
-            <div class="report-title">Store Intelligence Report</div>
-            <div class="report-sub" id="reportSubtitle">—</div>
+        <div id="reportDoc" style="display:none">
+          <div class="box" style="margin-bottom:16px;background:linear-gradient(135deg,#3B0764,#7C3AED);color:#fff;border:none">
+            <h2 style="font-size:20px">Store Intelligence Report</h2>
+            <p id="reportSubtitle" style="opacity:0.9;margin-top:6px;font-size:13px">—</p>
           </div>
-
-          <!-- Snapshot row -->
-          <div class="snapshot-row" id="snapRow"></div>
-
-          <!-- Funnel -->
-          <div class="report-section">
-            <div class="report-section-title">Customer Journey</div>
-            <div class="funnel-steps" id="funnelSteps"></div>
+          <div class="snap-grid" id="snapRow"></div>
+          <div class="grid" style="margin-bottom:16px">
+            <div class="box span-6">
+              <div class="box-title">Funnel counts</div>
+              <div class="chart-slot"><canvas id="chartReportFunnel"></canvas></div>
+            </div>
+            <div class="box span-6">
+              <div class="box-title">Stage drop-off</div>
+              <div class="chart-slot"><canvas id="chartReportDrop"></canvas></div>
+            </div>
           </div>
-
-          <!-- Zone table -->
-          <div class="report-section">
-            <div class="report-section-title">Zone Performance</div>
-            <table class="report-table">
-              <thead>
-                <tr>
-                  <th>Zone</th>
-                  <th>Visits</th>
-                  <th>Avg Dwell</th>
-                  <th>Dwell Share</th>
-                  <th>Assessment</th>
-                </tr>
-              </thead>
+          <div class="funnel-row" id="funnelSteps"></div>
+          <div class="grid" style="margin-bottom:16px">
+            <div class="box span-6">
+              <div class="box-title">Zone visits</div>
+              <div class="chart-slot"><canvas id="chartReportVisits"></canvas></div>
+            </div>
+            <div class="box span-6">
+              <div class="box-title">Dwell share</div>
+              <div class="chart-slot"><canvas id="chartReportDwell"></canvas></div>
+            </div>
+          </div>
+          <div class="box span-12" style="margin-bottom:16px">
+            <div class="box-title">Zone table</div>
+            <table class="data-table">
+              <thead><tr><th>Zone</th><th>Visits</th><th>Dwell</th><th>Share</th><th>Status</th></tr></thead>
               <tbody id="reportZoneBody"></tbody>
             </table>
           </div>
-
-          <!-- Alerts -->
-          <div class="report-section">
-            <div class="report-section-title">Alerts Raised</div>
-            <div id="reportAlerts"></div>
+          <div class="box">
+            <div class="box-title">Alerts</div>
+            <div id="reportAlerts" style="margin-top:12px"></div>
           </div>
         </div>
+      </section>
 
-      </div>
-    </div>
-  </div><!-- /viewReport -->
+    </main>
+  </div>
+</div>
 
-</div><!-- /app -->
+<button class="chat-fab" id="chatFab" type="button" title="Analytics assistant">💬</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <h3>Purplle Analytics Assistant</h3>
+    <p>Ask about conversion, zones, queue, revenue & alerts</p>
+  </div>
+  <div class="chat-msgs" id="chatMsgs">
+    <div class="msg bot">Hi! I can answer questions about today's store analytics. Try a suggestion below or type your own.</div>
+  </div>
+  <div class="chat-chips" id="chatChips"></div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="e.g. What is conversion today?" autocomplete="off" />
+    <button type="button" id="chatSend">Send</button>
+  </div>
+</div>
 
 <script>
-// ── Config ───────────────────────────────────────────────────────────────────
-const STORE_ID  = "ST1008";
-const DATE      = "2026-04-10";   // footage date
-const POLL_MS   = 5000;
+const STORE_ID = "ST1008";
+const DATE = "2026-04-10";
+const POLL_MS = 5000;
 
-// Zone brand colours (Purplle brand context)
-const ZONE_COLOURS = {
-  FACES_CANADA: "#C8006B", GOOD_VIBES: "#7C3AED", FOH_COUNTER: "#DB2777",
-  BILLING: "#D97706", NY_BAE: "#059669", DERMdoc: "#2563EB",
-  LAKME: "#C8006B", MINIMALIST: "#6B6B8A", THE_FACE_SHOP: "#9333EA",
-  ENTRY_ZONE: "#0891B2",
+const ZONE_COLORS = {
+  FACES_CANADA:"#C8006B", GOOD_VIBES:"#9333EA", FOH_COUNTER:"#DB2777",
+  BILLING:"#D97706", NY_BAE:"#059669", DERMdoc:"#2563EB", ENTRY_ZONE:"#0891B2",
 };
+const EVT_COLORS = {
+  ENTRY:"#059669", EXIT:"#6B6280", ZONE_ENTER:"#0891B2", ZONE_DWELL:"#0EA5E9",
+  BILLING_QUEUE_JOIN:"#D97706", BILLING_QUEUE_ABANDON:"#DC2626",
+};
+const CAM_ROLE = {
+  CAM_01:"Product zone", CAM_02:"Main floor", CAM_03:"Entry/exit",
+  CAM_04:"Stockroom", CAM_05:"Billing",
+};
+const PALETTE = ["#C8006B","#9333EA","#DB2777","#2563EB","#059669","#D97706","#0891B2","#6B6280"];
 
-// ── Clock ────────────────────────────────────────────────────────────────────
+let charts = {};
+let hist = { labels:[], visitors:[], buyers:[] };
+let counterState = {};
+let reportChartsReady = false;
+
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = "#6B6280";
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+
+function baseChartOptions(scales = true) {
+  const o = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 280 },
+    plugins: { legend: { labels: { padding: 12, font: { size: 11 } } } },
+  };
+  if (scales) {
+    o.scales = {
+      x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 } } },
+      y: { grid: { color: "rgba(0,0,0,0.04)" }, beginAtZero: true, ticks: { font: { size: 10 } } },
+    };
+  }
+  return o;
+}
+
+function makeChart(id, type, config) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  if (charts[id]) { charts[id].destroy(); }
+  charts[id] = new Chart(el.getContext("2d"), { type, ...config });
+  return charts[id];
+}
+
+function initCharts() {
+  makeChart("chartTrend", "line", {
+    data: {
+      labels: [],
+      datasets: [
+        { label: "Visitors", data: [], borderColor: "#C8006B", backgroundColor: "rgba(200,0,107,0.1)", fill: true, tension: 0.35 },
+        { label: "Buyers", data: [], borderColor: "#9333EA", backgroundColor: "rgba(147,51,234,0.06)", fill: true, tension: 0.35 },
+      ],
+    },
+    options: baseChartOptions(),
+  });
+
+  makeChart("chartFunnel", "bar", {
+    data: {
+      labels: ["Entry", "Zone", "Billing", "Purchase"],
+      datasets: [{ label: "Count", data: [0,0,0,0], backgroundColor: PALETTE, borderRadius: 8 }],
+    },
+    options: { ...baseChartOptions(), plugins: { legend: { display: false } } },
+  });
+
+  makeChart("chartZones", "bar", {
+    data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 6 }] },
+    options: { ...baseChartOptions(), indexAxis: "y", plugins: { legend: { display: false } } },
+  });
+
+  makeChart("chartDwellRev", "bar", {
+    data: {
+      labels: [],
+      datasets: [
+        { label: "Dwell %", data: [], backgroundColor: "rgba(147,51,234,0.7)", borderRadius: 4 },
+        { label: "Revenue %", data: [], backgroundColor: "rgba(200,0,107,0.85)", borderRadius: 4 },
+      ],
+    },
+    options: {
+      ...baseChartOptions(),
+      scales: {
+        x: { grid: { display: false } },
+        y: { max: 100, ticks: { callback: v => v + "%" }, grid: { color: "rgba(0,0,0,0.04)" } },
+      },
+    },
+  });
+
+  makeChart("chartEvents", "doughnut", {
+    data: { labels: [], datasets: [{ data: [], backgroundColor: PALETTE, borderWidth: 0 }] },
+    options: { ...baseChartOptions(false), cutout: "62%", plugins: { legend: { position: "right" } } },
+  });
+}
+
+function initReportCharts() {
+  if (reportChartsReady) return;
+  reportChartsReady = true;
+  makeChart("chartReportFunnel", "bar", {
+    data: { labels: [], datasets: [{ data: [], backgroundColor: PALETTE, borderRadius: 8 }] },
+    options: { ...baseChartOptions(), plugins: { legend: { display: false } } },
+  });
+  makeChart("chartReportDrop", "line", {
+    data: { labels: [], datasets: [{ label: "Drop-off %", data: [], borderColor: "#DC2626", fill: true, backgroundColor: "rgba(220,38,38,0.08)", tension: 0.3 }] },
+    options: { ...baseChartOptions(), plugins: { legend: { display: false } } },
+  });
+  makeChart("chartReportVisits", "bar", {
+    data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 6 }] },
+    options: { ...baseChartOptions(), plugins: { legend: { display: false } } },
+  });
+  makeChart("chartReportDwell", "bar", {
+    data: { labels: [], datasets: [{ label: "Dwell %", data: [], backgroundColor: "rgba(147,51,234,0.75)", borderRadius: 6 }] },
+    options: { ...baseChartOptions(), plugins: { legend: { display: false } }, indexAxis: "y" },
+  });
+}
+
+function resizeAllCharts() {
+  Object.values(charts).forEach(c => { if (c && c.resize) c.resize(); });
+}
+
+function zoneColor(n) {
+  return ZONE_COLORS[n] || PALETTE[Math.abs(n.split("").reduce((a,c)=>a+c.charCodeAt(0),0)) % PALETTE.length];
+}
+
+function setStatus(live, text) {
+  const dot = document.getElementById("sidebarDot");
+  const lbl = document.getElementById("sidebarStatusText");
+  dot.className = "dot" + (live ? " pulse" : " off");
+  lbl.textContent = text || (live ? "Live" : "Offline");
+}
+
 function updateClock() {
-  const now = new Date();
-  const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
-  document.getElementById("clock").textContent =
-    ist.toISOString().slice(11, 19) + " IST";
+  const ist = new Date(Date.now() + 5.5 * 3600000);
+  document.getElementById("clock").textContent = ist.toISOString().slice(11, 19) + " IST";
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// ── View switching ───────────────────────────────────────────────────────────
-function switchView(name) {
-  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach((b, i) => {
-    b.classList.toggle("active", (i === 0) === (name === "live"));
+document.querySelectorAll(".nav-item").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const v = btn.dataset.view;
+    document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b === btn));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    document.getElementById(v === "live" ? "viewLive" : "viewReport").classList.add("active");
+    document.getElementById("pageTitle").textContent = v === "live" ? "Live Dashboard" : "Store Report";
+    setTimeout(resizeAllCharts, 80);
   });
-  document.getElementById(name === "live" ? "viewLive" : "viewReport")
-    .classList.add("active");
-}
+});
 
-// ── MJPEG stream (native <img> animation) ───────────────────────────────────
-// Browsers animate multipart/x-mixed-replace responses INSIDE an <img>
-// element automatically — no JS draw loop, no canvas, no onload trick needed.
-let currentCam = "CAM_01";
-
-function openStream(camId) {
-  currentCam = camId;
-  document.getElementById("mainCamLabel").textContent =
-    `${camId} · ${getCamRole(camId)}`;
-
-  const img = document.getElementById("mainStream");
-  const awaiting = document.getElementById("mainAwaiting");
-  const rec = document.getElementById("mainRec");
-
-  // Cache-bust so switching cameras forces a new MJPEG connection
-  const url = `/stream/${camId}?skip=2&t=${Date.now()}`;
-
-  // Hide the placeholder once the first frame paints
-  img.onload = () => {
-    awaiting.style.display = "none";
-    rec.classList.add("visible");
-  };
-  img.onerror = () => {
-    awaiting.textContent = `Stream unavailable · ${camId}`;
-    awaiting.style.display = "flex";
-    rec.classList.remove("visible");
-  };
-
-  // Setting src on an <img> with multipart/x-mixed-replace makes the browser
-  // keep the HTTP connection open and replace the image each frame — natively.
-  img.src = url;
-}
-
-function getCamRole(id) {
-  const roles = { CAM_01:"Product Zone", CAM_02:"Product Zone", CAM_03:"Entry/Exit",
-    CAM_04:"Stockroom", CAM_05:"Billing Counter" };
-  return roles[id] || id;
-}
-
-// Start with CAM_01
-openStream("CAM_01");
-
-// ── SSE feed (metrics every 3s) ───────────────────────────────────────────────
-function startSSE() {
-  const src = new EventSource(`/api/live?store_id=${STORE_ID}&date=${DATE}`);
-  let lastTs = Date.now();
-
-  src.onmessage = (e) => {
-    lastTs = Date.now();
-    const dot = document.getElementById("statusDot");
-    const lbl = document.getElementById("statusLabel");
-    dot.className = "status-dot live";
-    lbl.textContent = "Live";
-    try {
-      const data = JSON.parse(e.data);
-      updateMetrics(data.metrics || {});
-      updateAlerts(data.anomalies || []);
-      updateZones(data.heatmap || {});
-    } catch {}
-  };
-
-  src.onerror = () => {
-    const dot = document.getElementById("statusDot");
-    dot.className = "status-dot disc";
-    document.getElementById("statusLabel").textContent = "Disconnected";
-  };
-
-  // Fallback: poll directly if SSE not available
-  setInterval(() => {
-    if (Date.now() - lastTs > 8000) {
-      pollFallback();
-    }
-  }, 8000);
-}
-
-async function pollFallback() {
-  const date = DATE;
-  try {
-    const [m, a, h] = await Promise.all([
-      fetch(`/stores/${STORE_ID}/metrics?date=${date}`).then(r => r.json()),
-      fetch(`/stores/${STORE_ID}/anomalies?date=${date}`).then(r => r.json()),
-      fetch(`/stores/${STORE_ID}/heatmap?date=${date}`).then(r => r.json()),
-    ]);
-    document.getElementById("statusDot").className = "status-dot live";
-    document.getElementById("statusLabel").textContent = "Live (polled)";
-    updateMetrics(m);
-    updateAlerts(a.anomalies || []);
-    updateZones(h);
-  } catch {
-    document.getElementById("statusDot").className = "status-dot disc";
-    document.getElementById("statusLabel").textContent = "Disconnected";
+function animateCounter(id, val, opts = {}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const start = counterState[id] ?? val;
+  const dur = 500;
+  const t0 = performance.now();
+  const fmt = opts.fmt || (v => String(Math.round(v)));
+  counterState[id] = val;
+  function step(t) {
+    const k = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - k, 3);
+    el.textContent = fmt(start + (val - start) * eased);
+    if (k < 1) requestAnimationFrame(step);
   }
+  requestAnimationFrame(step);
 }
 
-// ── Metrics update ───────────────────────────────────────────────────────────
+function setKpiBars(m) {
+  const maxV = Math.max(m.unique_visitors, 1);
+  document.getElementById("barConv").style.width = Math.min(100, m.conversion_rate * 100 * 3) + "%";
+  document.getElementById("barVisitors").style.width = Math.min(100, (m.unique_visitors / maxV) * 100) + "%";
+  document.getElementById("barRevenue").style.width = Math.min(100, (m.revenue_inr / Math.max(m.revenue_inr, 1)) * 100) + "%";
+  document.getElementById("barQueue").style.width = Math.min(100, (m.current_queue_depth / 10) * 100) + "%";
+}
+
 function updateMetrics(m) {
   if (!m || !("unique_visitors" in m)) return;
-
-  const conv = (m.conversion_rate * 100).toFixed(2) + "%";
-  const visitors = m.unique_visitors.toLocaleString();
-  const rev = "₹" + m.revenue_inr.toLocaleString("en-IN", {maximumFractionDigits:0});
-  const queue = m.current_queue_depth;
-
-  document.getElementById("mConv").textContent = conv;
-  document.getElementById("mVisitors").textContent = visitors;
-  document.getElementById("mRevenue").textContent = rev;
-
-  const qEl = document.getElementById("mQueue");
-  qEl.textContent = queue;
-  qEl.className = "metric-value" + (queue >= 6 ? " alert" : "");
-
-  const convSub = document.getElementById("mConvSub");
-  convSub.textContent = `${m.buyers} buyer${m.buyers !== 1 ? "s" : ""} · ${visitors} visitors`;
-
-  const revSub = document.getElementById("mRevSub");
-  revSub.textContent = `₹${m.revenue_per_visitor_inr.toFixed(0)} per visitor`;
-
+  animateCounter("mConv", m.conversion_rate * 100, { fmt: v => v.toFixed(2) + "%" });
+  animateCounter("mVisitors", m.unique_visitors, { fmt: v => Math.round(v).toLocaleString() });
+  animateCounter("mRevenue", m.revenue_inr, { fmt: v => "₹" + Math.round(v).toLocaleString("en-IN") });
+  document.getElementById("mQueue").textContent = m.current_queue_depth;
+  document.getElementById("mQueue").className = "kpi-value" + (m.current_queue_depth >= 6 ? " danger" : "");
+  document.getElementById("mConvSub").textContent = `${m.buyers} buyers · ${m.unique_visitors} visitors`;
+  document.getElementById("mRevSub").textContent = `₹${(m.revenue_per_visitor_inr || 0).toFixed(0)} per visitor`;
   const qSub = document.getElementById("mQueueSub");
-  if (queue >= 6) {
-    qSub.innerHTML = `<span class="queue-pulse"></span>Open second counter`;
-    qSub.className = "metric-sub negative";
+  if (m.current_queue_depth >= 6) {
+    qSub.textContent = "⚠ Open second counter";
+    qSub.style.color = "var(--bad)";
   } else {
-    qSub.textContent = "No alert";
-    qSub.className = "metric-sub";
+    qSub.textContent = "Normal";
+    qSub.style.color = "var(--muted)";
+  }
+  setKpiBars(m);
+
+  const label = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  hist.labels.push(label);
+  hist.visitors.push(m.unique_visitors);
+  hist.buyers.push(m.buyers);
+  if (hist.labels.length > 18) { hist.labels.shift(); hist.visitors.shift(); hist.buyers.shift(); }
+  if (charts.chartTrend) {
+    charts.chartTrend.data.labels = hist.labels;
+    charts.chartTrend.data.datasets[0].data = hist.visitors;
+    charts.chartTrend.data.datasets[1].data = hist.buyers;
+    charts.chartTrend.update("none");
   }
 }
 
-// ── Alerts update ─────────────────────────────────────────────────────────────
-function updateAlerts(anomalies) {
-  const list = document.getElementById("alertsList");
-  if (!anomalies.length) {
-    list.innerHTML = `<div class="all-clear">✓ All clear</div>`;
-    return;
-  }
-  list.innerHTML = anomalies.map(a => `
-    <div class="alert-item ${a.severity}">
-      <div class="alert-sev" style="color:${sevColour(a.severity)}">${a.severity}</div>
-      <div class="alert-type">${a.type.replace(/_/g, " ")}</div>
-      <div class="alert-action">${a.suggested_action}</div>
-    </div>`).join("");
+function updateFunnel(f) {
+  if (!f || !charts.chartFunnel) return;
+  const s = f.stages || {};
+  const keys = ["stage_entry","stage_zone_visit","stage_billing","stage_purchase"];
+  charts.chartFunnel.data.datasets[0].data = keys.map(k => (s[k] || {}).count || 0);
+  charts.chartFunnel.update("none");
 }
 
-function sevColour(s) {
-  return s === "CRITICAL" ? "#DC2626" : s === "WARN" ? "#D97706" : "#7C3AED";
-}
-
-// ── Zone table update ─────────────────────────────────────────────────────────
-function updateZones(heatmap) {
-  const zones = heatmap.zones || {};
-  const avs   = heatmap.attention_vs_sales || {};
+function updateZones(h) {
+  if (!h) return;
+  const zones = h.zones || {};
+  const avs = h.attention_vs_sales || {};
+  const sorted = Object.entries(zones).sort((a,b) => b[1].normalised_score - a[1].normalised_score);
   const tbody = document.getElementById("zoneTableBody");
-
-  const sorted = Object.entries(zones)
-    .sort((a, b) => b[1].normalised_score - a[1].normalised_score);
-
   if (!sorted.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="color:var(--light);font-size:12px">No zone data for this date.</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No data</td></tr>';
     return;
   }
-
-  const maxDwell = Math.max(...sorted.map(([, z]) => z.avg_dwell_ms), 1);
-
+  const labels = sorted.map(([n]) => n.replace(/_/g, " "));
+  if (charts.chartZones) {
+    charts.chartZones.data.labels = labels;
+    charts.chartZones.data.datasets[0].data = sorted.map(([,z]) => z.normalised_score);
+    charts.chartZones.data.datasets[0].backgroundColor = sorted.map(([n]) => zoneColor(n));
+    charts.chartZones.update("none");
+  }
+  if (charts.chartDwellRev) {
+    charts.chartDwellRev.data.labels = labels;
+    charts.chartDwellRev.data.datasets[0].data = sorted.map(([n]) => Math.round((avs[n]?.dwell_share||0)*100));
+    charts.chartDwellRev.data.datasets[1].data = sorted.map(([n]) => Math.round((avs[n]?.sales_share||0)*100));
+    charts.chartDwellRev.update("none");
+  }
+  const maxD = Math.max(...sorted.map(([,z]) => z.avg_dwell_ms), 1);
   tbody.innerHTML = sorted.map(([name, z]) => {
     const ds = avs[name]?.dwell_share || 0;
     const rs = avs[name]?.sales_share || 0;
-    const gap = ds - rs;
-    const dPct = Math.round(ds * 100);
-    const rPct = Math.round(rs * 100);
-    const dW = Math.round(z.avg_dwell_ms / maxDwell * 80);
-    const rW = Math.round(rs * 80);
-    const assessment = gap > 0.1
-      ? `<span class="gap-badge review">↑ Review placement</span>`
-      : `<span class="gap-badge ok">✓ Balanced</span>`;
-
-    return `
-      <tr>
-        <td class="zone-name-cell">${name.replace(/_/g, " ")}</td>
-        <td>
-          <div class="bar-wrap">
-            <div class="mini-bar bar-dwell" style="width:${dW}px"></div>
-            <span class="bar-val">${dPct}%</span>
-          </div>
-        </td>
-        <td>
-          <div class="bar-wrap">
-            <div class="mini-bar bar-rev" style="width:${Math.max(rW,2)}px"></div>
-            <span class="bar-val">${rPct}%</span>
-          </div>
-        </td>
-        <td>${assessment}</td>
-      </tr>`;
+    const dW = Math.round(z.avg_dwell_ms / maxD * 70);
+    const rW = Math.round(rs * 70);
+    const st = ds - rs > 0.1
+      ? '<span style="color:var(--bad);font-weight:600">Review</span>'
+      : '<span style="color:var(--ok);font-weight:600">OK</span>';
+    return `<tr>
+      <td><strong>${name.replace(/_/g," ")}</strong></td>
+      <td><div class="bar-inline"><div class="bar-fill bar-dwell" style="width:${dW}px"></div>${Math.round(ds*100)}%</div></td>
+      <td><div class="bar-inline"><div class="bar-fill bar-rev" style="width:${rW}px"></div>${Math.round(rs*100)}%</div></td>
+      <td>${st}</td></tr>`;
   }).join("");
 }
 
-// ── Report generation ─────────────────────────────────────────────────────────
-async function generateReport() {
-  const date  = document.getElementById("reportDate").value || DATE;
-  const btn   = document.querySelector(".btn-primary");
-  const spin  = document.getElementById("reportSpinner");
-  spin.style.display = "block";
-  btn.disabled = true;
+function updateAlerts(list) {
+  const el = document.getElementById("alertsList");
+  const items = list || [];
+  document.getElementById("alertCount").textContent = items.length;
+  if (!items.length) {
+    el.innerHTML = '<div class="kpi-foot" style="text-align:center;padding:24px;color:var(--ok)">✓ All clear</div>';
+    return;
+  }
+  el.innerHTML = items.map(a => `
+    <div class="alert-row ${a.severity}">
+      <strong style="color:${a.severity==="CRITICAL"?"var(--bad)":a.severity==="WARN"?"var(--warn)":"var(--accent-2)"}">${a.severity}</strong>
+      <div style="font-weight:600;margin:4px 0">${a.type.replace(/_/g," ")}</div>
+      <span>${a.suggested_action}</span>
+    </div>`).join("");
+}
 
+function renderBreakdown(bd) {
+  if (!bd?.headline) return;
+  const h = bd.headline;
+  document.getElementById("bdMeta").textContent =
+    `${h.events_total} events · ${h.unique_visitors_sessions} sessions`;
+  animateCounter("bdDoorEntries", h.door_entries_cam03, { fmt: v => Math.round(v) });
+  animateCounter("bdDoorExits", h.door_exits_cam03, { fmt: v => Math.round(v) });
+  animateCounter("bdInStore", h.estimated_in_store_now, { fmt: v => Math.round(v) });
+  const cb = bd.by_confidence_band || {};
+  document.getElementById("bdConf").textContent = `Confidence: H ${cb.HIGH||0} · M ${cb.MEDIUM||0} · L ${cb.LOW||0}`;
+
+  const cams = bd.by_camera || {};
+  document.getElementById("bdCameraBody").innerHTML = Object.keys(cams).sort().map(c => `
+    <tr><td><strong>${c}</strong></td><td>${CAM_ROLE[c]||"—"}</td>
+    <td>${cams[c].unique_customer_tracks}</td><td>${cams[c].events_total}</td></tr>`).join("");
+
+  const ev = bd.by_event_type || {};
+  const tot = Object.values(ev).reduce((a,b)=>a+b,0) || 1;
+  const entries = Object.entries(ev).sort((a,b)=>b[1]-a[1]);
+  document.getElementById("bdEventsBody").innerHTML = entries.map(([k,v]) =>
+    `<tr><td>${k}</td><td>${v}</td><td>${((v/tot)*100).toFixed(1)}%</td></tr>`).join("");
+
+  if (charts.chartEvents) {
+    const top = entries.slice(0, 7);
+    charts.chartEvents.data.labels = top.map(([k]) => k.replace(/_/g," "));
+    charts.chartEvents.data.datasets[0].data = top.map(([,v]) => v);
+    charts.chartEvents.data.datasets[0].backgroundColor = top.map(([k],i) => EVT_COLORS[k] || PALETTE[i]);
+    charts.chartEvents.update("none");
+  }
+}
+
+async function loadBreakdown() {
+  try {
+    const bd = await fetch(`/stores/${STORE_ID}/breakdown?date=${DATE}`).then(r => r.json());
+    renderBreakdown(bd);
+  } catch (e) { console.warn(e); }
+}
+
+function renderTicker(events) {
+  const el = document.getElementById("eventTicker");
+  if (!events?.length) {
+    el.innerHTML = '<div class="kpi-foot" style="padding:12px">No events</div>';
+    return;
+  }
+  el.innerHTML = events.map(e => `
+    <div class="ticker-item">
+      <span style="color:var(--muted)">${(e.ts||"").slice(11,19)}</span>
+      <span style="color:var(--accent-2);font-weight:600">${e.camera_id}</span>
+      <span style="color:${EVT_COLORS[e.event_type]||"var(--text)"};font-weight:600">${e.event_type}</span>
+      <span>${e.zone_id ? e.zone_id.replace(/_/g," ") : "—"} ${e.visitor_id||""}</span>
+    </div>`).join("");
+}
+
+async function loadTicker() {
+  try {
+    const ev = await fetch(`/events/recent?store_id=${STORE_ID}&date=${DATE}&limit=35`).then(r => r.json());
+    renderTicker(ev);
+  } catch {}
+}
+
+function openStream(camId) {
+  document.getElementById("mainCamLabel").textContent = `${camId} · ${getCamRole(camId)}`;
+  document.querySelectorAll(".cam-tab").forEach(t => t.classList.toggle("active", t.dataset.cam === camId));
+  const img = document.getElementById("mainStream");
+  const ov = document.getElementById("mainAwaiting");
+  const rec = document.getElementById("mainRec");
+  img.onload = () => { ov.style.display = "none"; rec.style.display = "inline"; };
+  img.onerror = () => { ov.style.display = "flex"; ov.textContent = `Stream unavailable · ${camId}`; rec.style.display = "none"; };
+  img.src = `/stream/${camId}?skip=2&t=${Date.now()}`;
+}
+function getCamRole(id) {
+  return { CAM_01:"Product Zone", CAM_02:"Floor", CAM_03:"Entry", CAM_04:"Stock", CAM_05:"Billing" }[id] || id;
+}
+document.querySelectorAll(".cam-tab").forEach(t => t.addEventListener("click", () => openStream(t.dataset.cam)));
+openStream("CAM_01");
+
+function startSSE() {
+  const src = new EventSource(`/api/live?store_id=${STORE_ID}&date=${DATE}`);
+  let last = Date.now();
+  src.onmessage = e => {
+    last = Date.now();
+    setStatus(true, "Live");
+    try {
+      const d = JSON.parse(e.data);
+      updateMetrics(d.metrics || {});
+      updateAlerts(d.anomalies || []);
+      updateZones(d.heatmap || {});
+      if (d.funnel) updateFunnel(d.funnel);
+    } catch {}
+  };
+  src.onerror = () => setStatus(false, "Disconnected");
+  setInterval(() => { if (Date.now() - last > 9000) pollFallback(); }, 9000);
+}
+
+async function pollFallback() {
+  try {
+    const [m, a, h, f] = await Promise.all([
+      fetch(`/stores/${STORE_ID}/metrics?date=${DATE}`).then(r => r.json()),
+      fetch(`/stores/${STORE_ID}/anomalies?date=${DATE}`).then(r => r.json()),
+      fetch(`/stores/${STORE_ID}/heatmap?date=${DATE}`).then(r => r.json()),
+      fetch(`/stores/${STORE_ID}/funnel?date=${DATE}`).then(r => r.json()),
+    ]);
+    setStatus(true, "Live");
+    updateMetrics(m);
+    updateAlerts(a.anomalies || []);
+    updateZones(h);
+    updateFunnel(f);
+  } catch { setStatus(false, "Offline"); }
+}
+
+async function generateReport() {
+  const date = document.getElementById("reportDate").value || DATE;
   try {
     const [m, f, h, a] = await Promise.all([
       fetch(`/stores/${STORE_ID}/metrics?date=${date}`).then(r => r.json()),
@@ -801,337 +1149,149 @@ async function generateReport() {
       fetch(`/stores/${STORE_ID}/heatmap?date=${date}`).then(r => r.json()),
       fetch(`/stores/${STORE_ID}/anomalies?date=${date}`).then(r => r.json()),
     ]);
-
-    renderReport(date, m, f, h, a);
+    initReportCharts();
     document.getElementById("reportDoc").style.display = "block";
-  } catch (e) {
-    alert("Failed to generate report: " + e.message);
-  } finally {
-    spin.style.display = "none";
-    btn.disabled = false;
-  }
-}
+    document.getElementById("reportSubtitle").textContent = `ST1008 · Brigade Road · ${date}`;
+    const basket = m.buyers > 0 ? Math.round(m.revenue_inr / m.buyers) : "—";
+    document.getElementById("snapRow").innerHTML = `
+      <div class="snap"><small>Conversion</small><b>${(m.conversion_rate*100).toFixed(2)}%</b></div>
+      <div class="snap"><small>Visitors</small><b>${m.unique_visitors}</b></div>
+      <div class="snap"><small>Revenue</small><b style="color:var(--accent)">₹${m.revenue_inr.toLocaleString("en-IN")}</b></div>
+      <div class="snap"><small>Avg basket</small><b>₹${basket}</b></div>`;
 
-function renderReport(date, m, f, h, a) {
-  document.getElementById("reportSubtitle").textContent =
-    `ST1008 · Brigade Road, Bengaluru · ${date}`;
+    const order = ["stage_entry","stage_zone_visit","stage_billing","stage_purchase"];
+    const labels = ["Entry","Zone visit","Billing","Purchase"];
+    const stages = f.stages || {};
+    const counts = order.map(k => (stages[k]||{}).count||0);
+    const drops = order.map((k,i) => i ? ((stages[k]||{}).drop_off_from_previous_pct||0) : 0);
 
-  // Snapshot row
-  const avgBasket = m.buyers > 0 ? (m.revenue_inr / m.buyers).toFixed(0) : "—";
-  document.getElementById("snapRow").innerHTML = `
-    <div class="snapshot-item"><div class="snap-label">Conversion Rate</div>
-      <div class="snap-value">${(m.conversion_rate * 100).toFixed(2)}%</div></div>
-    <div class="snapshot-item"><div class="snap-label">Unique Visitors</div>
-      <div class="snap-value">${m.unique_visitors.toLocaleString()}</div></div>
-    <div class="snapshot-item"><div class="snap-label">Revenue</div>
-      <div class="snap-value">₹${m.revenue_inr.toLocaleString("en-IN", {maximumFractionDigits:0})}</div></div>
-    <div class="snapshot-item"><div class="snap-label">Avg Basket Value</div>
-      <div class="snap-value">₹${avgBasket}</div></div>`;
+    charts.chartReportFunnel.data.labels = labels;
+    charts.chartReportFunnel.data.datasets[0].data = counts;
+    charts.chartReportFunnel.update();
 
-  // Funnel
-  const stageOrder = ["stage_entry","stage_zone_visit","stage_billing","stage_purchase"];
-  const stageLabel = {stage_entry:"Entry",stage_zone_visit:"Zone Visit",
-    stage_billing:"Billing",stage_purchase:"Purchase"};
-  const stages = f.stages || {};
-  const funnelHtml = stageOrder.map((key, i) => {
-    const s = stages[key] || {count:0,drop_off_from_previous_pct:0};
-    const drop = i > 0 && s.drop_off_from_previous_pct > 0
-      ? `<div class="funnel-step-drop">−${s.drop_off_from_previous_pct}%</div>` : "";
-    const arrow = i < stageOrder.length - 1 ? `<div class="funnel-arrow">→</div>` : "";
-    return `
-      <div class="funnel-step">
-        <div class="funnel-step-name">${stageLabel[key]}</div>
-        <div class="funnel-step-count">${s.count.toLocaleString()}</div>
-        ${drop}
-      </div>${arrow}`;
-  }).join("");
-  document.getElementById("funnelSteps").innerHTML = funnelHtml;
+    charts.chartReportDrop.data.labels = labels.slice(1);
+    charts.chartReportDrop.data.datasets[0].data = drops.slice(1);
+    charts.chartReportDrop.update();
 
-  // Zone table
-  const zones = h.zones || {};
-  const avs   = h.attention_vs_sales || {};
-  const sorted = Object.entries(zones).sort((a,b) => b[1].visit_count - a[1].visit_count);
-  document.getElementById("reportZoneBody").innerHTML = sorted.map(([name, z]) => {
-    const ds = avs[name]?.dwell_share || 0;
-    const dwell_s = (z.avg_dwell_ms / 1000).toFixed(0);
-    const assessment = ds > 0.1 ? "Review placement" : "Balanced";
-    return `<tr>
-      <td>${name.replace(/_/g," ")}</td>
-      <td>${z.visit_count}</td>
-      <td>${dwell_s}s avg</td>
-      <td>${(ds*100).toFixed(1)}%</td>
-      <td style="color:${ds>0.1?"#DC2626":"#16A34A"}">${assessment}</td>
-    </tr>`;
-  }).join("");
-
-  // Alerts
-  const alerts = a.anomalies || [];
-  document.getElementById("reportAlerts").innerHTML = alerts.length ? alerts.map(al => `
-    <div class="report-alert-row">
-      <span class="report-sev sev-${al.severity}">${al.severity}</span>
-      <div class="report-alert-body">
-        <div class="report-alert-type">${al.type.replace(/_/g," ")}</div>
-        <div class="report-alert-action">${al.suggested_action}</div>
-      </div>
-    </div>`).join("") :
-    `<div style="font-size:13px;color:var(--green)">No alerts raised during store hours.</div>`;
-}
-
-function exportReport(format) {
-  const date = document.getElementById("reportDate").value || DATE;
-  window.open(`/reports/export?store_id=${STORE_ID}&date=${date}&format=${format}`);
-}
-
-// ── Animated counter — number tweens to new value ───────────────────────────
-const counterState = {};
-function animateCounter(elId, newValue, options = {}) {
-  const decimals = options.decimals ?? 0;
-  const prefix   = options.prefix   ?? "";
-  const suffix   = options.suffix   ?? "";
-  const fmt      = options.format   ?? null;
-  const duration = options.duration ?? 600;
-
-  const el = document.getElementById(elId);
-  if (!el) return;
-  const start = counterState[elId] ?? newValue;
-  if (start === newValue) {
-    el.textContent = fmt ? fmt(newValue) : (prefix + newValue.toFixed(decimals) + suffix);
-    return;
-  }
-  counterState[elId] = newValue;
-  const t0 = performance.now();
-  const step = (t) => {
-    const k = Math.min(1, (t - t0) / duration);
-    // ease-out cubic
-    const eased = 1 - Math.pow(1 - k, 3);
-    const v = start + (newValue - start) * eased;
-    el.textContent = fmt ? fmt(v) : (prefix + v.toFixed(decimals) + suffix);
-    if (k < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-
-// Patch updateMetrics so the headline cards animate instead of jumping
-const _origUpdateMetrics = updateMetrics;
-updateMetrics = function(m) {
-  if (!m || !("unique_visitors" in m)) return;
-  animateCounter("mConv",     m.conversion_rate * 100, { decimals: 2, suffix: "%" });
-  animateCounter("mVisitors", m.unique_visitors,       { decimals: 0 });
-  animateCounter("mRevenue",  m.revenue_inr,           {
-    fmt: v => "₹" + Math.round(v).toLocaleString("en-IN")
-  });
-  const qEl = document.getElementById("mQueue");
-  qEl.textContent = m.current_queue_depth;
-  qEl.className = "metric-value" + (m.current_queue_depth >= 6 ? " alert" : "");
-
-  document.getElementById("mConvSub").textContent =
-    `${m.buyers} buyer${m.buyers !== 1 ? "s" : ""} · ${m.unique_visitors} visitors`;
-  document.getElementById("mRevSub").textContent =
-    `₹${(m.revenue_per_visitor_inr || 0).toFixed(0)} per visitor`;
-
-  const qSub = document.getElementById("mQueueSub");
-  if (m.current_queue_depth >= 6) {
-    qSub.innerHTML = `<span class="queue-pulse"></span>Open second counter`;
-    qSub.className = "metric-sub negative";
-  } else {
-    qSub.textContent = "No alert";
-    qSub.className = "metric-sub";
-  }
-};
-
-// ── Breakdown panel — explains where every number comes from ─────────────────
-const CAM_ROLE = {
-  CAM_01: "Product zone",
-  CAM_02: "Main floor",
-  CAM_03: "Entry / Exit",
-  CAM_04: "Stockroom (staff)",
-  CAM_05: "Billing counter",
-};
-
-async function loadBreakdown(date) {
-  try {
-    const bd = await fetch(`/stores/${STORE_ID}/breakdown?date=${date}`).then(r => r.json());
-    renderBreakdown(bd);
-  } catch (e) {
-    console.warn("breakdown load failed", e);
-  }
-}
-
-function renderBreakdown(bd) {
-  if (!bd || !bd.headline) return;
-  const h = bd.headline;
-
-  document.getElementById("bdMeta").textContent =
-    `${h.events_total} events · ${h.unique_visitors_raw_tracks} raw track IDs · ` +
-    `${h.unique_visitors_sessions} customer sessions · ${h.unique_staff_sessions} staff sessions`;
-
-  animateCounter("bdDoorEntries", h.door_entries_cam03);
-  animateCounter("bdDoorExits",   h.door_exits_cam03);
-  animateCounter("bdInStore",     h.estimated_in_store_now);
-
-  const cb = bd.by_confidence_band || {};
-  document.getElementById("bdConf").textContent =
-    `HIGH ${cb.HIGH || 0} · MED ${cb.MEDIUM || 0} · LOW ${cb.LOW || 0}`;
-
-  // Per-camera table
-  const cams = bd.by_camera || {};
-  const camRows = Object.keys(cams).sort().map(c => {
-    const r = cams[c];
-    return `<tr>
-      <td>${c}</td>
-      <td style="color:var(--mid)">${CAM_ROLE[c] || "—"}</td>
-      <td><strong>${r.unique_customer_tracks}</strong>
-        <span style="color:var(--light);font-size:10px"> / ${r.unique_tracks}</span></td>
-      <td>${r.events_total}</td>
-    </tr>`;
-  }).join("");
-  document.getElementById("bdCameraBody").innerHTML = camRows ||
-    `<tr><td colspan="4" style="color:var(--light);padding:10px 0">No camera events</td></tr>`;
-
-  // Events by type — sorted desc by count
-  const ev = bd.by_event_type || {};
-  const totalEv = Object.values(ev).reduce((a, b) => a + b, 0) || 1;
-  const evRows = Object.entries(ev)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => {
-      const pct = ((v / totalEv) * 100).toFixed(1);
-      return `<tr>
-        <td><code style="font-size:11px">${k}</code></td>
-        <td><strong>${v}</strong></td>
-        <td style="color:var(--mid)">${pct}%</td>
-      </tr>`;
+    document.getElementById("funnelSteps").innerHTML = order.map((k,i) => {
+      const s = stages[k]||{};
+      return `<div class="funnel-card"><small>${labels[i]}</small><b>${(s.count||0).toLocaleString()}</b>
+        ${i&&s.drop_off_from_previous_pct?`<div style="color:var(--bad);font-size:11px">−${s.drop_off_from_previous_pct}%</div>`:""}</div>`;
     }).join("");
-  document.getElementById("bdEventsBody").innerHTML = evRows ||
-    `<tr><td colspan="3" style="color:var(--light);padding:10px 0">No events</td></tr>`;
+
+    const zones = h.zones || {};
+    const avs = h.attention_vs_sales || {};
+    const sorted = Object.entries(zones).sort((a,b)=>b[1].visit_count-a[1].visit_count);
+    const zl = sorted.map(([n]) => n.replace(/_/g," "));
+    charts.chartReportVisits.data.labels = zl;
+    charts.chartReportVisits.data.datasets[0].data = sorted.map(([,z]) => z.visit_count);
+    charts.chartReportVisits.data.datasets[0].backgroundColor = sorted.map(([n]) => zoneColor(n));
+    charts.chartReportVisits.update();
+    charts.chartReportDwell.data.labels = zl;
+    charts.chartReportDwell.data.datasets[0].data = sorted.map(([n]) => Math.round((avs[n]?.dwell_share||0)*100));
+    charts.chartReportDwell.update();
+
+    document.getElementById("reportZoneBody").innerHTML = sorted.map(([name,z]) => {
+      const ds = avs[name]?.dwell_share||0;
+      return `<tr><td><strong>${name.replace(/_/g," ")}</strong></td><td>${z.visit_count}</td>
+        <td>${(z.avg_dwell_ms/1000).toFixed(0)}s</td><td>${(ds*100).toFixed(1)}%</td>
+        <td style="color:${ds>0.1?"var(--bad)":"var(--ok)"}">${ds>0.1?"Review":"OK"}</td></tr>`;
+    }).join("");
+
+    const alerts = a.anomalies || [];
+    document.getElementById("reportAlerts").innerHTML = alerts.length
+      ? alerts.map(al => `<div class="alert-row ${al.severity}"><strong>${al.severity}</strong>
+          <div style="font-weight:600;margin:4px 0">${al.type.replace(/_/g," ")}</div><span>${al.suggested_action}</span></div>`).join("")
+      : '<div style="color:var(--ok)">No alerts</div>';
+    setTimeout(resizeAllCharts, 100);
+  } catch (e) { alert("Report failed: " + e.message); }
 }
 
-// ── Live event ticker — last 30 events ───────────────────────────────────────
-const EVENT_COLOURS = {
-  ENTRY: "#16A34A", EXIT: "#6B6B8A", REENTRY: "#7C3AED",
-  ZONE_ENTER: "#0891B2", ZONE_EXIT: "#475569", ZONE_DWELL: "#0EA5E9",
-  BILLING_QUEUE_JOIN: "#D97706", BILLING_QUEUE_ABANDON: "#DC2626",
-};
+function exportReport(fmt) {
+  const date = document.getElementById("reportDate").value || DATE;
+  window.open(`/reports/export?store_id=${STORE_ID}&date=${date}&format=${fmt}`);
+}
 
-async function loadTicker(date) {
+/* ── Chatbot ── */
+const chatFab = document.getElementById("chatFab");
+const chatPanel = document.getElementById("chatPanel");
+const chatMsgs = document.getElementById("chatMsgs");
+const chatInput = document.getElementById("chatInput");
+const chatChips = document.getElementById("chatChips");
+
+const DEFAULT_CHIPS = [
+  "What is today's conversion?",
+  "How is the billing queue?",
+  "Which zones need review?",
+  "Summarize alerts",
+  "Give me an overview",
+];
+
+function renderChips(list) {
+  chatChips.innerHTML = (list || DEFAULT_CHIPS).map(q =>
+    `<button type="button" class="chip" data-q="${q.replace(/"/g, "&quot;")}">${q}</button>`).join("");
+  chatChips.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+    chatInput.value = c.dataset.q;
+    sendChat();
+  }));
+}
+renderChips(DEFAULT_CHIPS);
+
+function fmtBot(text) {
+  return text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>");
+}
+
+function addMsg(text, who) {
+  const d = document.createElement("div");
+  d.className = "msg " + who;
+  if (who === "bot") d.innerHTML = fmtBot(text);
+  else d.textContent = text;
+  chatMsgs.appendChild(d);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+}
+
+async function sendChat() {
+  const q = chatInput.value.trim();
+  if (!q) return;
+  chatInput.value = "";
+  addMsg(q, "user");
+  const typing = document.createElement("div");
+  typing.className = "msg bot typing";
+  typing.textContent = "Analyzing store data…";
+  chatMsgs.appendChild(typing);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
   try {
-    const r = await fetch(`/events/recent?store_id=${STORE_ID}&date=${date}&limit=40`);
-    const events = await r.json();
-    renderTicker(events);
-  } catch {}
-}
-
-function renderTicker(events) {
-  const el = document.getElementById("eventTicker");
-  if (!Array.isArray(events) || !events.length) {
-    el.innerHTML = `<div style="padding:16px;color:var(--light)">No events for this date.</div>`;
-    return;
+    const res = await fetch("/api/assistant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q, store_id: STORE_ID, date: DATE }),
+    });
+    const data = await res.json();
+    typing.remove();
+    addMsg(data.answer || "No answer available.", "bot");
+    if (data.suggestions?.length) renderChips(data.suggestions);
+  } catch (e) {
+    typing.remove();
+    addMsg("Sorry, I could not reach the analytics service. Is the API server running?", "bot");
   }
-  el.innerHTML = events.map(e => {
-    const ts = (e.ts || "").substring(11, 19);
-    const colour = EVENT_COLOURS[e.event_type] || "#1A1A2E";
-    const staff = e.is_staff
-      ? `<span style="color:#9090A8;font-size:10px">STAFF</span>` : "";
-    const zone = e.zone_id
-      ? `<span style="color:var(--mid);font-size:11px">→ ${e.zone_id.replace(/_/g, " ")}</span>` : "";
-    return `<div style="padding:6px 16px;border-bottom:1px solid var(--lavender);
-                        display:flex;gap:12px;align-items:center">
-      <span style="color:var(--light);font-size:11px;min-width:60px">${ts}</span>
-      <span style="color:var(--mid);font-size:11px;min-width:60px">${e.camera_id}</span>
-      <span style="color:${colour};font-weight:600;min-width:170px">${e.event_type}</span>
-      <span style="color:var(--navy);font-family:var(--mono);font-size:11px">${e.visitor_id}</span>
-      ${zone}
-      ${staff}
-    </div>`;
-  }).join("");
 }
 
-// ── Demo replay — animates from 0 → final state via SSE ─────────────────────
-let replaySrc = null;
-let replayActive = false;
-let originalSSE = null;
+chatFab.addEventListener("click", () => chatPanel.classList.toggle("open"));
+document.getElementById("chatSend").addEventListener("click", sendChat);
+chatInput.addEventListener("keydown", e => { if (e.key === "Enter") sendChat(); });
 
-function toggleReplay() {
-  const btn = document.getElementById("replayBtn");
-  if (replayActive) {
-    stopReplay();
-    btn.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--white)"></span>Replay 0 → 93 live`;
-    btn.style.background = "var(--magenta)";
-    return;
-  }
-
-  replayActive = true;
-  btn.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:#16A34A;animation:pulse 1s infinite"></span>Replaying… click to stop`;
-  btn.style.background = "#16A34A";
-
-  // Reset all counters
-  counterState.mConv = 0; counterState.mVisitors = 0; counterState.mRevenue = 0;
-  counterState.bdDoorEntries = 0; counterState.bdDoorExits = 0; counterState.bdInStore = 0;
-  updateMetrics({
-    conversion_rate: 0, unique_visitors: 0, buyers: 0,
-    current_queue_depth: 0, revenue_inr: 0, revenue_per_visitor_inr: 0,
-  });
-
-  replaySrc = new EventSource(
-    `/dashboard/replay/${STORE_ID}?date=${DATE}&speed=40`
-  );
-  replaySrc.onmessage = (e) => {
-    try {
-      const d = JSON.parse(e.data);
-      if (d.done) { stopReplay(); return; }
-      if (d.metrics) {
-        updateMetrics({
-          ...d.metrics,
-          revenue_per_visitor_inr: d.metrics.unique_visitors > 0
-            ? d.metrics.revenue_inr / d.metrics.unique_visitors : 0,
-        });
-      }
-      if (d.headline_breakdown) {
-        const h = d.headline_breakdown;
-        animateCounter("bdDoorEntries", h.door_entries_cam03);
-        animateCounter("bdDoorExits", h.door_exits_cam03);
-        animateCounter("bdInStore", h.estimated_in_store_now);
-      }
-      if (d.by_camera || d.by_event_type) {
-        renderBreakdown({
-          headline: d.headline_breakdown || { events_total: d.events_seen },
-          by_camera: d.by_camera || {},
-          by_event_type: d.by_event_type || {},
-          by_confidence_band: {},
-        });
-      }
-      if (d.latest_events) {
-        renderTicker(d.latest_events.map(e => ({ ...e })));
-      }
-      document.getElementById("tickerMeta").textContent =
-        `Replay · ${d.events_seen}/${d.events_total} events · ${d.replay_progress}%`;
-    } catch (err) { console.warn("replay parse", err); }
-  };
-  replaySrc.onerror = () => stopReplay();
-}
-
-function stopReplay() {
-  replayActive = false;
-  if (replaySrc) { replaySrc.close(); replaySrc = null; }
-  const btn = document.getElementById("replayBtn");
-  btn.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--white)"></span>Replay 0 → 93 live`;
-  btn.style.background = "var(--magenta)";
-  // Re-load real state
+/* ── Boot ── */
+document.addEventListener("DOMContentLoaded", () => {
+  initCharts();
+  startSSE();
   pollFallback();
-  loadBreakdown(DATE);
-  loadTicker(DATE);
-}
-
-document.getElementById("replayBtn").addEventListener("click", toggleReplay);
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-startSSE();
-pollFallback();
+  loadBreakdown();
+  loadTicker();
+  setTimeout(resizeAllCharts, 200);
+});
 setInterval(pollFallback, POLL_MS);
-
-// Breakdown + ticker
-loadBreakdown(DATE);
-loadTicker(DATE);
-setInterval(() => { if (!replayActive) { loadBreakdown(DATE); loadTicker(DATE); } }, 4000);
+setInterval(() => { loadBreakdown(); loadTicker(); }, 4000);
+window.addEventListener("resize", () => { clearTimeout(window._rsz); window._rsz = setTimeout(resizeAllCharts, 150); });
 </script>
 </body>
 </html>
